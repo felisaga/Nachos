@@ -43,31 +43,22 @@ Lock::GetName() const
 
 void
 Lock::Acquire()
-{
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-      // Disable interrupts.
-      
-    ASSERT(lockOwner != currentThread);
+{      
+    ASSERT(!IsHeldByCurrentThread());
     sem->P();
     lockOwner = currentThread;
     DEBUG('s', "Lock %s acquired by %p\n", name, currentThread);
-    
-    interrupt->SetLevel(oldLevel);  // Re-enable interrupts.
 }
 
 void
 Lock::Release()
 {
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-      // Disable interrupts.
-      
     DEBUG('s', "Lock %s try to be released by %p, lockowner %p\n", name, currentThread, lockOwner);
-    ASSERT(lockOwner == currentThread);
-    sem->V();
-    lockOwner = NULL;
-    DEBUG('s', "Lock %s released by %p\n", name, currentThread);
+    ASSERT(IsHeldByCurrentThread());
 
-    interrupt->SetLevel(oldLevel);  // Re-enable interrupts.
+    lockOwner = NULL;
+    sem->V();
+    DEBUG('s', "Lock %s released by %p\n", name, currentThread);
 }
 
 bool

@@ -78,7 +78,7 @@ private:
     Lock* lock;
     int waits = 0;
     Lock* lock_waits;
-    Semaphore* signal;
+    Semaphore* sem;
     // Other needed fields are to be added here.
 };
 

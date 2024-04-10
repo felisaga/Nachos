@@ -14,18 +14,16 @@
 #define BUFFER_SIZE 3
 #define TOTAL_ITEMS 1000
 
-int buffer[BUFFER_SIZE];
-// Lock *m = new Lock("ProdConsLock");
-// Condition *bufferNotEmpty = new Condition("ProdConsCond1", m); 
-// Condition *bufferNotFull  = new Condition("ProdConsCond2", m);
-int state = 0;
-int consumed = 0;
-int produced = 0;
-int finish = 0;
+static int buffer[BUFFER_SIZE];
+static int state = 0;
+static int consumed = 0;
+static int produced = 0;
+static int finish = 0;
 
-Lock* lock = new Lock("production");
-Condition* producerCond = new Condition("producer", lock);
-Condition* consumerCond = new Condition("consumer", lock);
+static Lock* lock = new Lock("production");
+
+static Condition* producerCond = new Condition("producer", lock);
+static Condition* consumerCond = new Condition("consumer", lock);
 
 void
 producerFun(void *name_)
@@ -80,7 +78,7 @@ consumerFun(void *name_)
 void
 ThreadTestProdCons()
 {
-    
+    printf("lock %s = %p\n", "production", lock);   
     Thread *producer = new Thread("producer");
     Thread *consumer = new Thread("consumer");
 
@@ -89,140 +87,9 @@ ThreadTestProdCons()
 
     while(!finish) currentThread->Yield();
 
+    delete lock;
+    delete producerCond;
+    delete consumerCond;
+
     printf("Test finished\n");
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-// #define M 5
-// #define N 5
-// #define SZ 8
-
-
-// /*
-//  * El buffer guarda punteros a enteros, los
-//  * productores los consiguen con malloc() y los
-//  * consumidores los liberan con free() 
-//  */
-
-// int *buffer[SZ];
-// int usados;
-
-
-// /*
-// Las variables de condicion son utiles cuando se necesita una comunicacion eficiente y segura entre hilos o procesos,
-// 	 evitando el uso de esperas activas o bucles de espera.
-// Ayudan a evitar condiciones de carrera y sincronizan la ejecucion de los hilos o procesos involucrados.
-// */
-
-// pthread_cond_t prod; // Se utiliza para bloquear a los productores cuando el buffer esta lleno.
-// pthread_cond_t cons; // Se utiliza para bloquear a los consumidores cuando el buffer esta vacio.
-
-// pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
-// // Si el mutex se libera antes del signal se podria llegar a perder la señal, perdiendo asi un valor producido 
-
-// void enviar(int *p)
-// {
-//     pthread_mutex_lock (&m);
-//     while (usados == SZ)			/* bloquear si el buffer esta lleno*/
-// 			pthread_cond_wait (&prod, &m);
-    
-// 	for(int i = 0; i < SZ; i++) 
-//         if(buffer[i] == NULL){
-//             buffer[i] = p;
-//             break;
-//         }
-// 	usados++;
-
-//     pthread_cond_signal (&cons); // Aviso que el buffer no esta vacio
-// 	pthread_mutex_unlock (&m);
-//     return;
-// }
-
-// int * recibir()
-// {
-// 	pthread_mutex_lock (&m);
-//     while (usados == 0)			/* bloquear si el buffer esta vacio */
-// 			pthread_cond_wait (&cons, &m);
-//     int *aux = NULL;
-// 	int i = 0;
-
-// 	for(int i = SZ-1; i >= 0; i--) 
-//         if(buffer[i] != NULL){
-//             aux = buffer[i];
-//             buffer[i] = NULL;
-//             break;
-//         }
-// 	usados--;
-
-//     pthread_cond_signal (&prod); // Aviso que el buffer no esta lleno
-
-// 	// Si el mutex se libera antes del signal se podria llegar a perder la señal, perdiendo asi un valor producido 
-// 	pthread_mutex_unlock (&m); 
-
-//     return aux;
-// }
-
-// void * prod_f(void *arg)
-// {
-// 	int id = arg - (void*)0;
-// 	while (1) {
-// 		sleep(random() % 3);
-
-// 		int *p = malloc(sizeof *p);
-// 		*p = random() % 100;
-// 		printf("Productor %d: produje %p->%d\n", id, p, *p);
-// 		enviar(p);
-// 	}
-// 	return NULL;
-// }
-
-// void * cons_f(void *arg)
-// {
-// 	int id = arg - (void*)0;
-// 	while (1) {
-// 		sleep(random() % 3);
-
-// 		int *p = recibir();
-// 		printf("Consumidor %d: obtuve %p->%d\n", id, p, *p);
-// 		free(p);
-// 	}
-// 	return NULL;
-// }
-
-// int main()
-// {
-// 	pthread_t productores[M], consumidores[N];
-// 	int i;
-
-//     for(i = 0; i<SZ; i++) buffer[i] = NULL;
-
-//     pthread_cond_init(&prod, NULL);
-//     pthread_cond_init(&cons, NULL);
-
-// 	for (i = 0; i < M; i++)
-// 		pthread_create(&productores[i], NULL, prod_f, i + (void*)0);
-
-// 	for (i = 0; i < N; i++)
-// 		pthread_create(&consumidores[i], NULL, cons_f, i + (void*)0);
-
-// 	pthread_join(productores[0], NULL); /* Espera para siempre */
-
-
-// 	return 0;
-// }
-
-
-// /*
-// Las variables de condición son útiles cuando se necesita una comunicación eficiente y segura entre hilos o procesos, evitando el uso de esperas activas o bucles de espera. Ayudan a evitar condiciones de carrera y sincronizan la ejecución de los hilos o procesos involucrados.
-// */

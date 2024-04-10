@@ -17,24 +17,28 @@
 
 #include "condition.hh"
 #include "system.hh"
-
-
+#include <cstring>
+#include <iostream>
 /// Dummy functions -- so we can compile our later assignments.
 ///
 
 Condition::Condition(const char *debugName, Lock *conditionLock)
 {
-    name = debugName;
+    char newname[100];
+    strcpy(newname, debugName);
+    strcat(newname, "sem");
+    printf("algo: %s boludo\n",newname);
     lock = conditionLock;
-    lock_waits = new Lock(debugName);
-    signal = new Semaphore(debugName, 0);
+    name = debugName;
+    lock_waits = new Lock("lockWaits");
+    sem = new Semaphore(newname, 0);
     DEBUG('s', "Condition variable %s created by %p\n", name, currentThread);
 }
 
 Condition::~Condition()
 {
     lock_waits->~Lock();
-    signal->~Semaphore();
+    sem->~Semaphore();
     DEBUG('s', "Condition variable %s destroyed by %p\n", name, currentThread);
 }
 
@@ -53,9 +57,10 @@ Condition::Wait()
 
     DEBUG('s', "Thread %p waiting condicion variable %s\n", currentThread, name);
     
+    DEBUG('s', "Release condition 56\n");
     lock->Release();
 
-    signal->P();
+    sem->P();
 
     lock->Acquire();
 }
@@ -65,12 +70,11 @@ Condition::Signal()
 {
     lock_waits->Acquire();
     if (waits > 0) {
-        signal->V();
+        sem->V();
         waits--;
     }
     lock_waits->Release();
     DEBUG('s', "Condition variable %s signaled by %p\n", name, currentThread);
-
 }
 
 void
@@ -78,7 +82,7 @@ Condition::Broadcast()
 {
     lock_waits->Acquire();
     while (waits > 0) {
-        signal->V();
+        sem->V();
         waits--;
     }
     lock_waits->Release();
