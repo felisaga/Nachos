@@ -28,32 +28,32 @@ static Condition* consumerCond = new Condition("consumer", lock);
 void
 producerFun(void *name_)
 {
-    while(produced < TOTAL_ITEMS-1) {
+    while(produced < TOTAL_ITEMS) {
         lock->Acquire();
 
-        if (state == BUFFER_SIZE-1) { /* bloquear si el buffer esta lleno*/
+        if (state == BUFFER_SIZE) { /* bloquear si el buffer esta lleno*/
             printf("Productor esperando (buffer lleno)\n");
 
             /* Aseguramos que el buffer esta en la condicion necesaria */
-            while (state == BUFFER_SIZE-1)
+            while (state == BUFFER_SIZE)
 		        producerCond->Wait();
         }			
         
-        printf("Productor produce: %d en %d\n", produced+1, state);
         buffer[state] = produced+1;
+        printf("Productor produce: %d en %d\n", buffer[state], state);
         state++;
         produced++;
         consumerCond->Signal();
 
         lock->Release();
     }
-    printf("Producidos: %d\n", produced+1);
+    printf("Producidos: %d\n", produced);
 }
 
 void
 consumerFun(void *name_)
 {
-    while(consumed < TOTAL_ITEMS-1) {
+    while(consumed < TOTAL_ITEMS) {
         lock->Acquire();
 
         if (state == 0) { /* bloquear si el buffer esta vacio*/
@@ -63,7 +63,7 @@ consumerFun(void *name_)
 		        consumerCond->Wait();
         }			
         
-        printf("Consumidor consume: %d en %d\n", buffer[state-1], state);
+        printf("Consumidor consume: %d en %d\n", buffer[state-1], state-1);
         buffer[state-1] = 0;
         state--;
         consumed++;
@@ -71,7 +71,7 @@ consumerFun(void *name_)
 
         lock->Release();
     }
-    printf("Consumidos: %d\n", consumed+1);
+    printf("Consumidos: %d\n", consumed);
     finish = 1;
 }
 

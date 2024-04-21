@@ -27,7 +27,6 @@ Condition::Condition(const char *debugName, Lock *conditionLock)
     char newname[100];
     strcpy(newname, debugName);
     strcat(newname, "sem");
-    printf("algo: %s boludo\n",newname);
     lock = conditionLock;
     name = debugName;
     lock_waits = new Lock("lockWaits");
@@ -51,6 +50,7 @@ Condition::GetName() const
 void
 Condition::Wait()
 {
+    ASSERT(lock->IsHeldByCurrentThread());
     lock_waits->Acquire();
     waits++;
     lock_waits->Release();
@@ -68,6 +68,7 @@ Condition::Wait()
 void
 Condition::Signal()
 {
+    ASSERT(lock->IsHeldByCurrentThread());
     lock_waits->Acquire();
     if (waits > 0) {
         sem->V();
@@ -80,6 +81,7 @@ Condition::Signal()
 void
 Condition::Broadcast()
 {
+    ASSERT(lock->IsHeldByCurrentThread());
     lock_waits->Acquire();
     while (waits > 0) {
         sem->V();
