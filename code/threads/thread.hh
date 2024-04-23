@@ -48,6 +48,7 @@
 
 #include <stdint.h>
 
+class Channel;
 
 /// CPU register state to be saved on context switch.
 ///
@@ -62,6 +63,8 @@ const unsigned MACHINE_STATE_SIZE = 17;
 /// WATCH OUT IF THIS IS NOT BIG ENOUGH!!!!!
 const unsigned STACK_SIZE = 4 * 1024;
 
+/// Levels of thread priorities
+const unsigned MAX_PRIORITY = 9;
 
 /// Thread state.
 enum ThreadStatus {
@@ -97,7 +100,7 @@ private:
 public:
 
     /// Initialize a `Thread`.
-    Thread(const char *debugName);
+    Thread(const char *debugName, int flag = 0, unsigned priority = 4);
 
     /// Deallocate a Thread.
     ///
@@ -126,7 +129,11 @@ public:
 
     const char *GetName() const;
 
+    unsigned GetPriority();
+
     void Print() const;
+
+    void Join();
 
 private:
     // Some of the private data for this class is listed above.
@@ -140,6 +147,10 @@ private:
     ThreadStatus status;
 
     const char *name;
+    Channel *channel;
+    int joinFlag;
+
+    unsigned priority;
 
     /// Allocate a stack for thread.  Used internally by `Fork`.
     void StackAllocate(VoidFunctionPtr func, void *arg);
@@ -178,6 +189,5 @@ extern "C" {
     // Stop running `oldThread` and start running `newThread`.
     void SWITCH(Thread *oldThread, Thread *newThread);
 }
-
 
 #endif

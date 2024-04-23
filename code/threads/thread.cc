@@ -20,6 +20,7 @@
 #include "thread.hh"
 #include "switch.h"
 #include "system.hh"
+#include "channel.hh"
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -40,12 +41,16 @@ IsThreadStatus(ThreadStatus s)
 /// `Thread::Fork`.
 ///
 /// * `threadName` is an arbitrary string, useful for debugging.
-Thread::Thread(const char *threadName)
+Thread::Thread(const char *threadName, int flag_, unsigned priority_)
 {
+    ASSERT(priority_ <= MAX_PRIORITY && priority_ >= 0);
+    joinFlag = flag_;
     name     = threadName;
     stackTop = nullptr;
     stack    = nullptr;
     status   = JUST_CREATED;
+    priority = priority_;
+    channel  = new Channel(threadName);
 #ifdef USER_PROGRAM
     space    = nullptr;
 #endif
@@ -61,6 +66,8 @@ Thread::Thread(const char *threadName)
 /// Nachos.
 Thread::~Thread()
 {
+    if (channel != nullptr)
+        delete channel;
     DEBUG('t', "Deleting thread \"%s\"\n", name);
 
     ASSERT(this != currentThread);
@@ -68,6 +75,7 @@ Thread::~Thread()
         SystemDep::DeallocBoundedArray((char *) stack,
                                        STACK_SIZE * sizeof *stack);
     }
+
 }
 
 /// Invoke `(*func)(arg)`, allowing caller and callee to execute
@@ -100,6 +108,16 @@ Thread::Fork(VoidFunctionPtr func, void *arg)
     scheduler->ReadyToRun(this);  // `ReadyToRun` assumes that interrupts
                                   // are disabled!
     interrupt->SetLevel(oldLevel);
+}
+
+void
+Thread::Join()
+{
+    ASSERT(joinFlag);
+    DEBUG('t', "Join \"%s\"\n", name);
+
+    int buf = 0;
+    channel->Receive(&buf);
 }
 
 /// Check a thread's stack to see if it has overrun the space that has been
@@ -135,6 +153,12 @@ Thread::GetName() const
     return name;
 }
 
+unsigned 
+Thread::GetPriority()
+{
+    return priority;
+}
+
 void
 Thread::Print() const
 {
@@ -157,9 +181,10 @@ Thread::Finish()
 {
     interrupt->SetLevel(INT_OFF);
     ASSERT(this == currentThread);
-
     DEBUG('t', "Finishing thread \"%s\"\n", GetName());
-
+    if(joinFlag){
+        channel->Send(1);
+    }
     threadToBeDestroyed = currentThread;
     Sleep();  // Invokes `SWITCH`.
     // Not reached.
