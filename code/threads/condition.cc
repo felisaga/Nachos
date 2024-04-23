@@ -36,8 +36,8 @@ Condition::Condition(const char *debugName, Lock *conditionLock)
 
 Condition::~Condition()
 {
-    lock_waits->~Lock();
-    sem->~Semaphore();
+    delete lock_waits;
+    delete sem;
     DEBUG('s', "Condition variable %s destroyed by %p\n", name, currentThread);
 }
 
