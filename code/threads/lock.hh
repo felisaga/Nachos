@@ -47,6 +47,7 @@ public:
     void Acquire();
     void Release();
 
+    unsigned getMaxPriority();
     /// Returns `true` if the current thread is the one that possesses the
     /// lock.
     ///
@@ -59,8 +60,9 @@ private:
     Semaphore* sem;
     const char *name;
     Thread* lockOwner;
+
+    unsigned priorities[MAX_PRIORITY + 1];
     // Add other needed fields here.
 };
-
 
 #endif

@@ -152,3 +152,14 @@ Scheduler::Print()
         readyList[i]->Apply(ThreadPrint);
     }
 }
+
+void
+Scheduler::ChangePriority(Thread *thread, unsigned newPriority)
+{
+    thread->SetPriority(newPriority);
+    if (readyList[thread->GetOriginalPriority()]->Has(thread))
+    {
+        readyList[thread->GetOriginalPriority()]->Remove(thread);
+    }
+    ReadyToRun(thread);
+}

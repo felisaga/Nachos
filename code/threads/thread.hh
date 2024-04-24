@@ -131,9 +131,13 @@ public:
 
     unsigned GetPriority();
 
+    unsigned GetOriginalPriority();
+
     void Print() const;
 
     void Join();
+
+    void SetPriority(unsigned newPriority);
 
 private:
     // Some of the private data for this class is listed above.
@@ -150,7 +154,7 @@ private:
     Channel *channel;
     int joinFlag;
 
-    unsigned priority;
+    unsigned priority, originalPriority;
 
     /// Allocate a stack for thread.  Used internally by `Fork`.
     void StackAllocate(VoidFunctionPtr func, void *arg);

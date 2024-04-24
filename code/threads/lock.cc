@@ -13,10 +13,10 @@
 ///               2016-2021 Docentes de la Universidad Nacional de Rosario.
 /// All rights reserved.  See `copyright.h` for copyright notice and
 /// limitation of liability and disclaimer of warranty provisions.
-
-
 #include "lock.hh"
 #include "system.hh"
+#include "scheduler.hh"
+#include <stdio.h>
 
 /// Dummy functions -- so we can compile our later assignments.
 
@@ -41,11 +41,41 @@ Lock::GetName() const
     return name;
 }
 
+unsigned Lock::getMaxPriority()
+{
+    int i; 
+    for(i = MAX_PRIORITY; i > 0; i--){
+        if(priorities[i]) break;
+    }
+    return i;
+}
+
+/*
+    El problema no se podría resolver con semáforos ya que con los mismos
+    cualquier hilo puede liberar el semáforo. En cambio con los locks, al 
+    solo el dueño poder levantarlo, se puede solucionar el problema.
+
+*/
+
 void
 Lock::Acquire()
 {      
     ASSERT(!IsHeldByCurrentThread());
+    /// Me fijo si tengo una prioridad mas alta que la actual del lock y si la tengo cambio la del lock y la del lock owner
+    unsigned priority = currentThread->GetOriginalPriority();
+
+    if(lockOwner != nullptr &&lockOwner->GetPriority() < priority)
+        scheduler->ChangePriority(lockOwner, priority);
+
+    
+    priorities[priority]++;
+
     sem->P();
+
+    /// Me fijo si el lock tiene una prioridad mas alta que yo si la tiene cambio mi prioridad para tenerla
+    if(getMaxPriority() > priority)
+        scheduler->ChangePriority(currentThread, getMaxPriority());
+
     lockOwner = currentThread;
     DEBUG('s', "Lock %s acquired by %p\n", name, currentThread);
 }
@@ -57,7 +87,14 @@ Lock::Release()
     ASSERT(IsHeldByCurrentThread());
 
     lockOwner = NULL;
+    
+    priorities[currentThread->GetOriginalPriority()] --;
+    
     sem->V();
+    
+    /// Vuelvo mi prioridad a la original
+    currentThread->SetPriority(currentThread->GetOriginalPriority());
+
     DEBUG('s', "Lock %s released by %p\n", name, currentThread);
 }
 

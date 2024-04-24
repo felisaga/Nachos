@@ -17,6 +17,8 @@
 #include "thread_test_simple.hh"
 #include "thread_test_channel.hh"
 #include "thread_test_join.hh"
+#include "thread_test_priority.hh"
+
 
 #include "lib/utility.hh"
 
@@ -37,8 +39,8 @@ static const Test TESTS[] = {
     { &ThreadTestProdCons, "prodcons", "Producer/Consumer" },
     { &ThreadTestGardenSem, "garden sem", "Ornamental garden with semaphores"},
     { &ThreadTestChannel, "channel", "Channel test"},
-    { &ThreadTestJoin, "join", "Thread Join test"}
-
+    { &ThreadTestJoin, "join", "Thread Join test"},
+    { &ThreadTestPriority, "Priority", "Thread Priority test"}
 };
 static const unsigned NUM_TESTS = sizeof TESTS / sizeof TESTS[0];
 

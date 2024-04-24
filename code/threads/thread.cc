@@ -50,6 +50,7 @@ Thread::Thread(const char *threadName, int flag_, unsigned priority_)
     stack    = nullptr;
     status   = JUST_CREATED;
     priority = priority_;
+    originalPriority = priority;
     channel  = new Channel(threadName);
 #ifdef USER_PROGRAM
     space    = nullptr;
@@ -120,6 +121,12 @@ Thread::Join()
     channel->Receive(&buf);
 }
 
+void
+Thread::SetPriority(unsigned newPriority)
+{
+    priority = newPriority;
+}
+
 /// Check a thread's stack to see if it has overrun the space that has been
 /// allocated for it.  If we had a smarter compiler, we would not need to
 /// worry about this, but we do not.
@@ -157,6 +164,12 @@ unsigned
 Thread::GetPriority()
 {
     return priority;
+}
+
+unsigned 
+Thread::GetOriginalPriority()
+{
+    return originalPriority;
 }
 
 void
