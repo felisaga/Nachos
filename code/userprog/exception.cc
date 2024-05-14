@@ -98,17 +98,197 @@ SyscallHandler(ExceptionType _et)
             char filename[FILE_NAME_MAX_LEN + 1];
             if (!ReadStringFromUser(filenameAddr,
                                     filename, sizeof filename)) {
-                DEBUG('e', "Error: filename string too long (maximum is %u bytes).\n",
-                      FILE_NAME_MAX_LEN);
+                DEBUG('e', "Error: filename string too long (maximum is %u bytes).\n", FILE_NAME_MAX_LEN);
             }
 
             DEBUG('e', "`Create` requested for file `%s`.\n", filename);
+
+            bool success = fileSystem->Create(filename, 0);
+
+            if (success)
+            {
+                DEBUG('e', "File `%s` created successfully.\n", filename);
+                machine->WriteRegister(2, 0);
+            }
+            else
+            {
+                DEBUG('e', "Failed to create file `%s`.\n", filename);
+                machine->WriteRegister(2, -1);
+            }
+
             break;
         }
 
         case SC_CLOSE: {
             int fid = machine->ReadRegister(4);
             DEBUG('e', "`Close` requested for id %u.\n", fid);
+
+            if(fid == CONSOLE_INPUT || fid == CONSOLE_OUTPUT){
+                DEBUG('e', "Error: Trying to close stdin or stdout\n");
+                machine->WriteRegister(2, -1);
+            break;
+            }
+
+            if(currentThread->HasFile(fid)){
+                currentThread->RemoveFile(fid);
+                machine->WriteRegister(2, 1);
+            }
+            else{
+                DEBUG('e', "Error: File not open");
+                machine->WriteRegister(2, 0);
+            }
+
+            break;
+        }
+
+        case SC_REMOVE: {
+            int filenameAddr = machine->ReadRegister(4);
+            
+            if (filenameAddr == 0) {
+                DEBUG('e', "Error: address to filename string is null.\n");
+            }
+            
+            char filename[FILE_NAME_MAX_LEN + 1];
+            if (!ReadStringFromUser(filenameAddr,
+                                    filename, sizeof filename)) {
+                DEBUG('e', "Error: filename string too long (maximum is %u bytes).\n", FILE_NAME_MAX_LEN);
+            }
+
+            DEBUG('e', "`Remove` requested for file '%s'.\n", filename);
+
+            if(fileSystem->Remove(filename)) {
+                DEBUG('e', "`File `%s` removed.\n", filename);
+                machine->WriteRegister(2, 1);
+            } else {
+                DEBUG('e', "Error: file '%s' could not be removed.\n", filename);
+                machine->WriteRegister(2, -1);
+            }
+            
+            break;
+        }
+
+        case SC_OPEN: {
+            int filenameAddr = machine->ReadRegister(4);
+            
+            if (filenameAddr == 0) {
+                DEBUG('e', "Error: address to filename string is null.\n");
+            }
+            
+            char filename[FILE_NAME_MAX_LEN + 1];
+            if (!ReadStringFromUser(filenameAddr,
+                                    filename, sizeof filename)) {
+                DEBUG('e', "Error: filename string too long (maximum is %u bytes).\n", FILE_NAME_MAX_LEN);
+            }
+
+            DEBUG('e', "`Open` requested for file '%s'.\n", filename);
+            OpenFile *file = fileSystem->Open(filename);
+
+            if(file == nullptr){
+                DEBUG('e', "Error: File '%s' could not be opened.\n", filename);
+                machine->WriteRegister(2, -1);
+                break;
+            }
+
+            int fileId = currentThread->AddFile(file);
+            if(fileId != -1) {
+                machine->WriteRegister(2, fileId);
+            } else {
+                machine->WriteRegister(2, -1);
+            }
+
+            break;
+        }
+
+        case SC_READ: {
+            int buffer = machine->ReadRegister(4);
+            int size = machine->ReadRegister(5);
+            int fid = machine->ReadRegister(6);
+            DEBUG('e', "`Open` requested for fileId '%i'.\n", fid);
+
+            ASSERT(size > 0);
+            ASSERT(buffer != 0);
+            
+            if(fid < 0){
+                DEBUG('e', "Error: Invalid fileId.\n");
+                machine->WriteRegister(2, -1);
+            }
+            else{
+                if(fid == CONSOLE_INPUT) {
+                    int i;
+                    char aux[size + 1];
+                    for (i = 0; i < size; i++)
+                    {
+                        aux[i] = synchConsole->GetChar();
+                    }
+                    WriteBufferToUser(aux, buffer, size);
+                    machine->WriteRegister(2, size);
+                }
+                else{
+                    if(currentThread->HasFile(fid)){
+                        char aux[size + 1];
+                        OpenFile *file = currentThread->GetFile(fid);
+                        int result = file->Read(aux, size);
+                        if(result > 0)
+                            WriteBufferToUser(aux, buffer, result);
+                        machine->WriteRegister(2, result);
+                    }
+                    else{
+                        DEBUG('e', "Error: File not open");
+                        machine->WriteRegister(2, 0);
+                    }
+                }
+            }
+            break;
+        }
+
+        case SC_WRITE: {
+            int buffer = machine->ReadRegister(4);
+            int size = machine->ReadRegister(5);
+            int fid = machine->ReadRegister(6);
+            DEBUG('e', "`Open` requested for fileId '%i'.\n", fid);
+
+            ASSERT(size > 0);
+            ASSERT(buffer != 0);
+
+            if(fid < 0){
+                DEBUG('e', "Error: Invalid fileId.\n");
+                machine->WriteRegister(2, -1);
+            }
+            else{
+                if(fid == CONSOLE_OUTPUT) {
+                    int result = 0;
+                    char aux[size + 1];
+                    ReadBufferFromUser(buffer, aux, size);
+                    for (int i = 0; i < size; i++)
+                    {
+                        synchConsole->PutChar(aux[i]);
+                    }
+                    result = size;
+
+                    machine->WriteRegister(2, result);
+                }
+                else{
+                    if(currentThread->HasFile(fid)){
+                        char aux[size + 1];
+                        OpenFile *file = currentThread->GetFile(fid);
+                        ReadBufferFromUser(buffer, aux, size);
+                        int result = file->Write(aux, size);
+                        machine->WriteRegister(2, result);
+                    }
+                    else{
+                        DEBUG('e', "Error: File not open");
+                        machine->WriteRegister(2, 0);
+                    }
+                }
+            }
+            break;
+        }
+        
+        case SC_EXIT: {
+            int status = machine->ReadRegister(4);
+            DEBUG('d', "Finishing thread %s with status %d\n", currentThread->GetName(), status);
+            currentThread->Finish();
+            DEBUG('e', "Thread finished.\n");
             break;
         }
 
