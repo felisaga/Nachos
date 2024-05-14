@@ -18,12 +18,13 @@ static int buffer[BUFFER_SIZE];
 static int state = 0;
 static int consumed = 0;
 static int produced = 0;
-static int finish = 0;
 
 static Lock* lock = new Lock("production");
 
 static Condition* producerCond = new Condition("producer", lock);
 static Condition* consumerCond = new Condition("consumer", lock);
+
+Semaphore *semaphore = new Semaphore("prod cons", 0);
 
 void
 producerFun(void *name_)
@@ -48,6 +49,8 @@ producerFun(void *name_)
         lock->Release();
     }
     printf("Producidos: %d\n", produced);
+
+    semaphore->V();
 }
 
 void
@@ -72,7 +75,8 @@ consumerFun(void *name_)
         lock->Release();
     }
     printf("Consumidos: %d\n", consumed);
-    finish = 1;
+
+    semaphore->V();
 }
 
 void
@@ -85,11 +89,13 @@ ThreadTestProdCons()
     producer->Fork(producerFun, NULL);
     consumer->Fork(consumerFun, NULL);
 
-    while(!finish) currentThread->Yield();
+    semaphore->P();
+    semaphore->P();
 
     delete lock;
     delete producerCond;
     delete consumerCond;
+    delete semaphore;
 
     printf("Test finished\n");
 }
