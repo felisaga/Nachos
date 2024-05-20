@@ -53,6 +53,7 @@ Thread::Thread(const char *threadName, int flag_, unsigned priority_)
     originalPriority = priority;
     channel  = new Channel(threadName);
 #ifdef USER_PROGRAM
+    fileTable = new Table<OpenFile *>();
     space    = nullptr;
 #endif
 }
@@ -76,6 +77,10 @@ Thread::~Thread()
         SystemDep::DeallocBoundedArray((char *) stack,
                                        STACK_SIZE * sizeof *stack);
     }
+
+    #ifdef USER_PROGRAM
+        delete fileTable;
+    #endif
 
 }
 
@@ -321,6 +326,28 @@ Thread::StackAllocate(VoidFunctionPtr func, void *arg)
 
 #ifdef USER_PROGRAM
 #include "machine/machine.hh"
+
+void Thread::RemoveFile(int fileId)
+{
+    fileId = fileId - 2;
+    OpenFile *file = fileTable->Remove(fileId);
+    delete file;
+}
+int Thread::AddFile(OpenFile *file)
+{
+    int tmp = fileTable->Add(file);
+    return tmp + 2; // Para evitar que nos devuelva 0 y 1 que estan reservados para la consola
+}
+bool Thread::HasFile(int fileId)
+{
+    fileId = fileId - 2;
+    return fileTable->HasKey(fileId);
+}
+OpenFile *Thread::GetFile(int fileId)
+{
+    fileId = fileId - 2;
+    return fileTable->Get(fileId);
+}
 
 /// Save the CPU state of a user program on a context switch.
 ///

@@ -47,6 +47,8 @@
 #endif
 
 #include <stdint.h>
+#include "lib/table.hh"
+#include "filesys/open_file.hh"
 
 class Channel;
 
@@ -160,6 +162,8 @@ private:
     void StackAllocate(VoidFunctionPtr func, void *arg);
 
 #ifdef USER_PROGRAM
+    Table<OpenFile *> *fileTable;
+    
     /// User-level CPU register state.
     ///
     /// A thread running a user program actually has *two* sets of CPU
@@ -168,7 +172,14 @@ private:
     int userRegisters[NUM_TOTAL_REGS];
 
 public:
+    int AddFile(OpenFile *file);
 
+    void RemoveFile(int fileId);
+
+    bool HasFile(int fileId);
+
+    OpenFile *GetFile(int fileId);
+    
     // Save user-level register state.
     void SaveUserState();
 
