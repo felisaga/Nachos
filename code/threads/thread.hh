@@ -186,6 +186,9 @@ public:
     // Restore user-level register state.
     void RestoreUserState();
 
+    int LoadAddressSpace(AddressSpace *newSpace);
+
+    int pid;
     // User code this thread is running.
     AddressSpace *space;
 #endif

@@ -54,6 +54,7 @@ Thread::Thread(const char *threadName, int flag_, unsigned priority_)
     channel  = new Channel(threadName);
 #ifdef USER_PROGRAM
     fileTable = new Table<OpenFile *>();
+    pid = activeThreads->Add(this);
     space    = nullptr;
 #endif
 }
@@ -79,10 +80,22 @@ Thread::~Thread()
     }
 
     #ifdef USER_PROGRAM
+        if(space != nullptr) delete space;
         delete fileTable;
+        activeThreads->Remove(pid);
     #endif
 
 }
+
+
+#ifdef USER_PROGRAM
+int
+Thread::LoadAddressSpace(AddressSpace *newSpace)
+{
+    space = newSpace;
+    return pid;
+}
+#endif
 
 /// Invoke `(*func)(arg)`, allowing caller and callee to execute
 /// concurrently.

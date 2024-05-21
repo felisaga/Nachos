@@ -38,12 +38,15 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
           numPages, size);
 
     // First, set up the translation.
-
+    pages->Print();
     pageTable = new TranslationEntry[numPages];
+    char *mainMemory = machine->mainMemory;
     for (unsigned i = 0; i < numPages; i++) {
         pageTable[i].virtualPage  = i;
           // For now, virtual page number = physical page number.
-        pageTable[i].physicalPage = i;
+        pageTable[i].physicalPage = pages->Find(); // = i; 
+        memset(mainMemory + pageTable[i].physicalPage * PAGE_SIZE, 0, PAGE_SIZE);
+
         pageTable[i].valid        = true;
         pageTable[i].use          = false;
         pageTable[i].dirty        = false;
@@ -51,12 +54,12 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
           // If the code segment was entirely on a separate page, we could
           // set its pages to be read-only.
     }
+    pages->Print();
 
-    char *mainMemory = machine->mainMemory;
 
     // Zero out the entire address space, to zero the unitialized data
     // segment and the stack segment.
-    memset(mainMemory, 0, size);
+    // memset(mainMemory, 0, size);
 
     // Then, copy in the code and data segments into memory.
     uint32_t codeSize = exe.GetCodeSize();
@@ -81,6 +84,11 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 /// Nothing for now!
 AddressSpace::~AddressSpace()
 {
+    pages->Print();
+    for (unsigned i = 0; i < numPages; i++) {
+        pages->Clear(pageTable[i].physicalPage); // = i; 
+    }
+    pages->Print();
     delete [] pageTable;
 }
 

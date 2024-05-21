@@ -21,8 +21,13 @@ main(void)
         buffer[--i] = '\0';
 
         if (i > 0) {
-            newProc = Exec(buffer);
-            Join(newProc);
+            if(buffer[0] == '&') {
+                newProc = Exec(buffer+1);
+            }
+            else {
+                newProc = Exec(buffer);
+                Join(newProc);
+            }
         }
     }
 

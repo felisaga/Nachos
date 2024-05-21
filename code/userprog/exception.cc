@@ -26,6 +26,7 @@
 #include "syscall.h"
 #include "filesys/directory_entry.hh"
 #include "threads/system.hh"
+#include "userprog/address_space.hh"
 
 #include <stdio.h>
 
@@ -60,6 +61,17 @@ DefaultHandler(ExceptionType et)
             ExceptionTypeToString(et), exceptionArg);
     ASSERT(false);
 }
+
+void runProgram(void* argv_)
+{
+    currentThread->space->InitRegisters(); // Set the initial register values.
+    currentThread->space->RestoreState();  // Load page table register.
+
+    DEBUG('e', "Running program.\n");
+    
+    machine->Run();
+}
+
 
 /// Handle a system call exception.
 ///
@@ -268,7 +280,7 @@ SyscallHandler(ExceptionType _et)
                     machine->WriteRegister(2, result);
                 }
                 else{
-                    if(currentThread->HasFile(fid)){
+                    if(currentThread->HasFile(fid)) {
                         char aux[size + 1];
                         OpenFile *file = currentThread->GetFile(fid);
                         ReadBufferFromUser(buffer, aux, size);
@@ -289,6 +301,61 @@ SyscallHandler(ExceptionType _et)
             DEBUG('d', "Finishing thread %s with status %d\n", currentThread->GetName(), status);
             currentThread->Finish();
             DEBUG('e', "Thread finished.\n");
+            break;
+        }
+
+        case SC_EXEC: {
+            int filenameAddr = machine->ReadRegister(4);
+
+            if (filenameAddr == 0) {
+                DEBUG('e', "Error: address to filename string is null.\n");
+                machine->WriteRegister(2, -1);
+                break;
+            }
+
+            char filename[FILE_NAME_MAX_LEN + 1];
+            if (!ReadStringFromUser(filenameAddr, filename, FILE_NAME_MAX_LEN)) {
+                DEBUG('e', "Error: filename '%s' too long (maximum is %u bytes).\n", filename, FILE_NAME_MAX_LEN);
+                machine->WriteRegister(2, -1);
+                break;
+            }
+
+            DEBUG('e', "`Exec` requested for file `%s`.\n", filename);
+
+            OpenFile *file = fileSystem->Open(filename);
+            AddressSpace *space = new AddressSpace(file);
+
+            Thread *newThread = new Thread(filename, 1);
+            SpaceId id = newThread->LoadAddressSpace(space);
+
+            if (id < 0) {
+                delete newThread;
+                delete file;
+                machine->WriteRegister(2, -1);
+                DEBUG('e', "Error creating new thread");
+                break;
+            }
+
+            newThread->Fork(runProgram, nullptr);
+
+            machine->WriteRegister(2, id);
+            break;
+        }
+
+        case SC_JOIN: {
+            SpaceId id = machine->ReadRegister(4);
+            DEBUG('e', "`Join` requested for id %d.\n", id);
+
+            if (!activeThreads->HasKey(id)) {
+                DEBUG('e', "Error: Thread not found.\n");
+                machine->WriteRegister(2, -1);
+                break;
+            }
+
+            Thread *thread = activeThreads->Get(id);
+
+            thread->Join();
+            machine->WriteRegister(2, 1);
             break;
         }
 

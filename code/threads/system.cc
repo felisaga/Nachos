@@ -40,6 +40,8 @@ SynchDisk *synchDisk;
 #ifdef USER_PROGRAM  // Requires either *FILESYS* or *FILESYS_STUB*.
 Machine *machine;  ///< User program memory and registers.
 SynchConsole *synchConsole;
+Bitmap *pages;
+Table<Thread *> *activeThreads;
 #endif
 
 // External definition, to allow us to take a pointer to this function.
@@ -125,6 +127,10 @@ Initialize(int argc, char **argv)
 #ifdef USER_PROGRAM
     bool debugUserProg = false;  // Single step user program.
     int numPhysicalPages = DEFAULT_NUM_PHYS_PAGES;
+    pages = new Bitmap(numPhysicalPages);
+    
+    activeThreads = new Table<Thread*>();
+    activeThreads->Add(currentThread);
 #endif
 #ifdef FILESYS_NEEDED
     bool format = false;  // Format disk.
