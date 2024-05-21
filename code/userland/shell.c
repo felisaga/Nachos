@@ -111,7 +111,7 @@ main(void)
         if (lineSize == 0) {
             continue;
         }
-
+        
         if (PrepareArguments(line, argv, MAX_ARG_COUNT) == 0) {
             WriteError("too many arguments.", OUTPUT);
             continue;
@@ -120,13 +120,13 @@ main(void)
         // Comment and uncomment according to whether command line arguments
         // are given in the system call or not.
         if(line[0] == '&'){
-            const SpaceId newProc = Exec(line+1);
+           const SpaceId newProc = Exec(line+1, argv);
         }
         else {
-            const SpaceId newProc = Exec(line);
-            Join(newProc);
+           const SpaceId newProc = Exec(line, argv);
+           Join(newProc);
         }
-        //const SpaceId newProc = Exec(line, argv);
+        // const SpaceId newProc = Exec(line, argv);
 
         // TODO: check for errors when calling `Exec`; this depends on how
         //       errors are reported.

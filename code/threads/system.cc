@@ -127,7 +127,6 @@ Initialize(int argc, char **argv)
 #ifdef USER_PROGRAM
     bool debugUserProg = false;  // Single step user program.
     int numPhysicalPages = DEFAULT_NUM_PHYS_PAGES;
-    pages = new Bitmap(numPhysicalPages);
     
     activeThreads = new Table<Thread*>();
     activeThreads->Add(currentThread);
@@ -173,6 +172,9 @@ Initialize(int argc, char **argv)
         }
 #endif
     }
+    #ifdef USER_PROGRAM
+    pages = new Bitmap(numPhysicalPages);   
+    #endif
 
     debug.SetFlags(debugFlags);  // Initialize `DEBUG` messages.
     debug.SetOpts(debugOpts);    // Set debugging behavior.

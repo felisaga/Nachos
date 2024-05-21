@@ -8,7 +8,9 @@
 
 #include "address_space.hh"
 #include "executable.hh"
+#include "exception_type.hh"
 #include "threads/system.hh"
+#include "lib/utility.hh"
 
 #include <string.h>
 
@@ -34,18 +36,19 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
       // Check we are not trying to run anything too big -- at least until we
       // have virtual memory.
 
+    ASSERT(numPages <= pages->CountClear());
+
     DEBUG('a', "Initializing address space, num pages %u, size %u\n",
           numPages, size);
 
     // First, set up the translation.
-    pages->Print();
     pageTable = new TranslationEntry[numPages];
     char *mainMemory = machine->mainMemory;
+    
     for (unsigned i = 0; i < numPages; i++) {
         pageTable[i].virtualPage  = i;
           // For now, virtual page number = physical page number.
         pageTable[i].physicalPage = pages->Find(); // = i; 
-        memset(mainMemory + pageTable[i].physicalPage * PAGE_SIZE, 0, PAGE_SIZE);
 
         pageTable[i].valid        = true;
         pageTable[i].use          = false;
@@ -53,9 +56,8 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
         pageTable[i].readOnly     = false;
           // If the code segment was entirely on a separate page, we could
           // set its pages to be read-only.
+        memset(&mainMemory[pageTable[i].physicalPage * PAGE_SIZE], 0, PAGE_SIZE);
     }
-    pages->Print();
-
 
     // Zero out the entire address space, to zero the unitialized data
     // segment and the stack segment.
@@ -64,19 +66,70 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
     // Then, copy in the code and data segments into memory.
     uint32_t codeSize = exe.GetCodeSize();
     uint32_t initDataSize = exe.GetInitDataSize();
+
     if (codeSize > 0) {
-        uint32_t virtualAddr = exe.GetCodeAddr();
-        DEBUG('a', "Initializing code segment, at 0x%X, size %u\n",
-              virtualAddr, codeSize);
-        exe.ReadCodeBlock(&mainMemory[virtualAddr], codeSize, 0);
+        uint32_t virtualAddr = exe.GetCodeAddr(); // Direccion virtual del codigo en el exe y del codigo en el stack virtual
+
+        unsigned offset = 0;
+        uint32_t leftToRead = codeSize;
+
+        while (leftToRead > 0) {
+            uint32_t virtualPage = DivRoundDown(virtualAddr, PAGE_SIZE);
+            uint32_t physicalAddr = pageTable[virtualPage].physicalPage * PAGE_SIZE;
+            
+            uint32_t bytesToRead = leftToRead > PAGE_SIZE ? PAGE_SIZE : leftToRead;
+
+            uint32_t pageOffset = virtualAddr % PAGE_SIZE;      // Posicion en la pagina desde donde hay que leer
+            physicalAddr += pageOffset;
+
+            uint32_t pageRemaining = PAGE_SIZE - pageOffset;    // me dice cuantos bytes me faltan para terminar la pagina
+            if(pageRemaining < bytesToRead){
+                bytesToRead = pageRemaining;
+            }
+
+            DEBUG('a', "Initializing code segment, at virtual address 0x%X, physical address 0x%X size %u\n", virtualAddr, physicalAddr, bytesToRead);
+
+            exe.ReadCodeBlock(&mainMemory[physicalAddr], bytesToRead, offset);
+            offset += bytesToRead;
+            leftToRead -= bytesToRead;
+            virtualAddr += bytesToRead;
+
+            if (leftToRead > 0 && pageOffset == 0) {
+                pageTable[virtualPage].readOnly = true;
+            }
+        }
     }
+    
     if (initDataSize > 0) {
         uint32_t virtualAddr = exe.GetInitDataAddr();
-        DEBUG('a', "Initializing data segment, at 0x%X, size %u\n",
-              virtualAddr, initDataSize);
-        exe.ReadDataBlock(&mainMemory[virtualAddr], initDataSize, 0);
-    }
 
+        unsigned offset = 0;
+        uint32_t leftToRead = initDataSize;
+
+        while (leftToRead > 0) {
+            uint32_t virtualPage = DivRoundDown(virtualAddr, PAGE_SIZE);
+            uint32_t physicalAddr = pageTable[virtualPage].physicalPage * PAGE_SIZE;
+            
+            uint32_t bytesToRead = leftToRead > PAGE_SIZE ? PAGE_SIZE : leftToRead;
+
+            uint32_t pageOffset = virtualAddr % PAGE_SIZE;      // Posicion en la pagina desde donde hay que leer
+            physicalAddr += pageOffset;
+            uint32_t pageRemaining = PAGE_SIZE - pageOffset;    // me dice cuantos bytes me faltan para terminar la pagina
+            if(pageRemaining < bytesToRead){
+                bytesToRead = pageRemaining;
+            }
+
+            // Por si el segmento codigo comparte paguina con el segmento de datos
+            pageTable[virtualPage].readOnly = false;
+
+            DEBUG('a', "Initializing data segment, at virtual address 0x%X, physical address 0x%X size %u\n", virtualAddr, physicalAddr, bytesToRead);
+
+            exe.ReadDataBlock(&mainMemory[physicalAddr], bytesToRead, offset);
+            offset += bytesToRead;
+            leftToRead -= bytesToRead;
+            virtualAddr += bytesToRead;
+        }
+    }
 }
 
 /// Deallocate an address space.
@@ -84,11 +137,9 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 /// Nothing for now!
 AddressSpace::~AddressSpace()
 {
-    pages->Print();
     for (unsigned i = 0; i < numPages; i++) {
         pages->Clear(pageTable[i].physicalPage); // = i; 
     }
-    pages->Print();
     delete [] pageTable;
 }
 

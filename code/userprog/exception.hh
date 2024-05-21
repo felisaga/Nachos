@@ -5,6 +5,7 @@
 #ifndef NACHOS_USERPROG_EXCEPTION__HH
 #define NACHOS_USERPROG_EXCEPTION__HH
 
+#include "args.hh"
 
 /// Set exception handlers for every exception type.
 ///
