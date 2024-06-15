@@ -73,7 +73,7 @@ int
 Table<T>::Add(T item)
 {
     int i;
-
+    
     if (!freed.IsEmpty()) {
         i = freed.Pop();
         data[i] = item;
