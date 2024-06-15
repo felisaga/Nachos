@@ -55,6 +55,7 @@ Thread::Thread(const char *threadName, int flag_, unsigned priority_)
 #ifdef USER_PROGRAM
     fileTable = new Table<OpenFile *>();
     space    = nullptr;
+    TlbIndex = 0;
 #endif
 }
 

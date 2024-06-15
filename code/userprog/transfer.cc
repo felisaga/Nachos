@@ -5,6 +5,7 @@
 
 #include "transfer.hh"
 #include "lib/utility.hh"
+#include "userprog/exception.hh"
 #include "threads/system.hh"
 
 
@@ -19,7 +20,7 @@ void ReadBufferFromUser(int userAddress, char *outBuffer,
     do {
         int temp;
         count++;
-        ASSERT(machine->ReadMem(userAddress++, 1, &temp));
+        while(machine->ReadMem(userAddress++, 1, &temp) == false);
         *outBuffer = (unsigned char) temp;
         outBuffer++;
     } while ( count < byteCount);
@@ -36,7 +37,7 @@ bool ReadStringFromUser(int userAddress, char *outString,
     do {
         int temp;
         count++;
-        ASSERT(machine->ReadMem(userAddress++, 1, &temp));
+        while(machine->ReadMem(userAddress++, 1, &temp) == false);
         *outString = (unsigned char) temp;
     } while (*outString++ != '\0' && count < maxByteCount);
 
@@ -53,7 +54,7 @@ void WriteBufferToUser(const char *buffer, int userAddress,
     unsigned count = 0;
     do {
         count++;
-        ASSERT(machine->WriteMem(userAddress++, 1, *buffer));
+        while(machine->WriteMem(userAddress++, 1, *buffer) == false);
         buffer++;
     } while (count < byteCount);
 
@@ -65,7 +66,7 @@ void WriteStringToUser(const char *string, int userAddress)
     ASSERT(string != nullptr);
 
     do {
-        ASSERT(machine->WriteMem(userAddress++, 1, *string));
+        while(machine->WriteMem(userAddress++, 1, *string) == false);
     } while (*string++ != '\0');
 
 }

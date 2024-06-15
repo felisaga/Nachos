@@ -127,6 +127,18 @@ AddressSpace::SaveState()
 void
 AddressSpace::RestoreState()
 {
+  #ifdef  USE_TLB
+    for(unsigned i = 0; i < TLB_SIZE; i++)
+      machine->GetMMU()->tlb[i].valid = false;
+  #endif
+
+  #ifndef  USE_TLB
     machine->GetMMU()->pageTable     = pageTable;
     machine->GetMMU()->pageTableSize = numPages;
+  #endif
+}
+
+TranslationEntry 
+AddressSpace::GetEntry(unsigned vpn){
+  return pageTable[vpn];
 }

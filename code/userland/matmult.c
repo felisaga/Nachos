@@ -39,6 +39,7 @@ main(void)
         }
     }
 
+    Write("jajaxd\n", 4, CONSOLE_OUTPUT);
     // And then we are done.
     return C[DIM - 1][DIM - 1];
 }
