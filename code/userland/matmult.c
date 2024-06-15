@@ -7,7 +7,7 @@
 
 
 #include "syscall.h"
-
+#include "lib.c"
 
 /// Sum total of the arrays does not fit in physical memory.
 #define DIM  20
@@ -38,8 +38,10 @@ main(void)
             }
         }
     }
-
-    Write("jajaxd\n", 4, CONSOLE_OUTPUT);
+    int res = C[DIM - 1][DIM - 1];
+    char buff[100];
+    itoa(res, buff);
+    Write(buff, strlen(buff), CONSOLE_OUTPUT);
     // And then we are done.
-    return C[DIM - 1][DIM - 1];
+    return res; // 7220
 }
