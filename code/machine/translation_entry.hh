@@ -32,27 +32,27 @@ class TranslationEntry {
 public:
 
     /// The page number in virtual memory.
-    unsigned virtualPage;
+    unsigned virtualPage = 0;
 
     /// The page number in real memory (relative to the start of
     /// `mainMemory`).
-    unsigned physicalPage;
+    unsigned physicalPage = 0;
 
     /// If this bit is set, the translation is ignored.
     ///
     /// (In other words, the entry has not been initialized.)
-    bool valid;
+    bool valid = 0;
 
     /// If this bit is set, the user program is not allowed to modify the
     /// contents of the page.
-    bool readOnly;
+    bool readOnly = 0;
 
     /// This bit is set by the hardware every time the page is referenced or
     /// modified.
-    bool use;
+    bool use = 0;
 
     /// This bit is set by the hardware every time the page is modified.
-    bool dirty;
+    bool dirty = 0;
 
 };
 

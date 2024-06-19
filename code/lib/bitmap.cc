@@ -8,7 +8,7 @@
 
 
 #include "bitmap.hh"
-
+#include <stdlib.h>
 #include <stdio.h>
 
 /// Initialize a bitmap with `nitems` bits, so that every bit is clear.  It
@@ -27,8 +27,8 @@ Bitmap::Bitmap(unsigned nitems)
     }
 
     #ifdef SWAP
-    struct coreEntry coreMap2[nitems];
-    coreMap = coreMap2;
+    //struct coreEntry coreMap[nitems];
+    coreMap = (coreEntry*) malloc(sizeof(coreEntry)*nitems);
     #endif
 }
 

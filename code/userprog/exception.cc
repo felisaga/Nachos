@@ -148,12 +148,18 @@ SyscallHandler(ExceptionType _et)
 
         case SC_CLOSE: {
             int fid = machine->ReadRegister(4);
-            DEBUG('e', "`Close` requested for id %u.\n", fid);
+            DEBUG('e', "`Close` requested for id %i.\n", fid);
 
             if(fid == CONSOLE_INPUT || fid == CONSOLE_OUTPUT){
                 DEBUG('e', "Error: Trying to close stdin or stdout\n");
                 machine->WriteRegister(2, -1);
-            break;
+                break;
+            }
+
+            if(fid < 0){
+                DEBUG('e', "Error: Trying to close Invalid file id\n");
+                machine->WriteRegister(2, -1);
+                break;
             }
 
             if(currentThread->HasFile(fid)){

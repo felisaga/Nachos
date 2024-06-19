@@ -18,11 +18,11 @@
 int
 AddressSpace::addPage(unsigned vpn){
   int frame = pages->Find(); 
-
+  DEBUG('a', "Frame selected for page %u is %d\n", vpn, frame);
   #ifdef SWAP
   if(frame == -1) { // No hay suficiente espacio
     int victim = pages->PickVictim(machine->GetNumPhysicalPages());
-    DEBUG('e', "Freeing up frame %d for page %u\n", victim, vpn);
+    DEBUG('a', "Freeing up frame %d for page %u\n", victim, vpn);
 
     unsigned oldVpn = pages->GetVPN(victim);
     ASSERT(oldVpn != (unsigned) -1);
@@ -35,17 +35,19 @@ AddressSpace::addPage(unsigned vpn){
         if (machine->GetMMU()->tlb[i].valid && machine->GetMMU()->tlb[i].physicalPage == (unsigned) victim){ //Actualizo los bits
           oldEntry->use = machine->GetMMU()->tlb[i].use;
           oldEntry->dirty = machine->GetMMU()->tlb[i].dirty;
+          machine->GetMMU()->tlb[i].valid = false;
         }
 
     
     // If it's a dirty page, swap it on disk.
-    if (oldEntry->dirty)
+    //if (oldEntry->dirty || !oldThread->space->swapMap->Test(oldVpn))
         oldThread->space->SwapPage(oldVpn);
 
     pages->RemoveEntry(victim);
 
     frame = pages->Find();
     ASSERT(frame != -1);
+    pages->AddEntry(frame, vpn, currentThread);
   }
   else{
     pages->AddEntry(frame, vpn, currentThread);
@@ -58,7 +60,7 @@ AddressSpace::addPage(unsigned vpn){
 #ifdef SWAP
 void
 AddressSpace::SwapPage(unsigned vpn) {
-  DEBUG('e', "Writing virtual page %u on disk.\n", vpn);
+  DEBUG('a', "Writing virtual page %u on disk.\n", vpn);
 
   unsigned physicalAddress = pageTable[vpn].physicalPage * PAGE_SIZE;
   char* mainMemory = machine->mainMemory;
@@ -96,7 +98,7 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 
     #ifdef SWAP
       // Initialize swap file.
-      DEBUG('e', "Initialize swap file\n");
+      DEBUG('a', "Initialize swap file\n");
       char swapFileName[FILE_NAME_MAX_LEN];
       snprintf(swapFileName, FILE_NAME_MAX_LEN, "SWAP.%u", currentThread->pid);
       fileSystem->Create(swapFileName, size);
@@ -117,12 +119,6 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
     for (unsigned i = 0; i < numPages; i++) {
         pageTable[i].virtualPage  = i;
           // For now, virtual page number = physical page number.
-        #ifndef DEMAND_LOADING
-          addPage(i); //pageTable[i].physicalPage = pages->Find(); // = i;
-          memset(&mainMemory[pageTable[i].physicalPage * PAGE_SIZE], 0, PAGE_SIZE);
-        #else
-          pageTable[i].physicalPage = -1;
-        #endif 
 
         pageTable[i].valid        = true;
         pageTable[i].use          = false;
@@ -130,6 +126,12 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
         pageTable[i].readOnly     = false;
           // If the code segment was entirely on a separate page, we could
           // set its pages to be read-only.
+        #ifndef DEMAND_LOADING
+          pageTable[i].physicalPage = addPage(i); //pageTable[i].physicalPage = pages->Find(); // = i;
+          memset(&mainMemory[pageTable[i].physicalPage * PAGE_SIZE], 0, PAGE_SIZE);
+        #else
+          pageTable[i].physicalPage = -1;
+        #endif 
     }
 
     // Zero out the entire address space, to zero the unitialized data
@@ -210,17 +212,19 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 
 TranslationEntry*
 AddressSpace::LoadPage(unsigned vpn) {
+  //DEBUG('e', "Load requested for page %u\n", vpn);
   if(pageTable[vpn].physicalPage != (unsigned) -1) // La pagina ya esta cargada
     return &pageTable[vpn];
 
   char *mainMemory = machine->mainMemory;
   pageTable[vpn].physicalPage = addPage(vpn);
   uint32_t physicalAddr = pageTable[vpn].physicalPage * PAGE_SIZE;
+  memset(&mainMemory[physicalAddr], 0, PAGE_SIZE);
 
   #ifdef SWAP
   if(swapMap->Test(vpn)){ // Ya esta cargada en swap
-    DEBUG('e', "Hay una pagina en swap\n");
-    swapMap->Clear(vpn);
+    DEBUG('a', "La pagina %d esta en swap\n",vpn);
+    //swapMap->Clear(vpn);
     swapFile->ReadAt(&(mainMemory[physicalAddr]), PAGE_SIZE, vpn * PAGE_SIZE);
     return &pageTable[vpn];
   }
@@ -232,24 +236,24 @@ AddressSpace::LoadPage(unsigned vpn) {
   uint32_t initDataSize = exe.GetInitDataSize();
   unsigned exePos = (vpn * PAGE_SIZE); // Nuestra posicion en el exe
 
-  DEBUG('a', "Initializing page %u, physical address 0x%X\n", vpn, physicalAddr);
-
-  memset(&mainMemory[physicalAddr], 0, PAGE_SIZE);
   // Stack
   if (exePos > codeSize + initDataSize) {
+    DEBUG('a', "Initializing stack page %u, physical address 0x%X\n", vpn, physicalAddr);
     pageTable[vpn].readOnly = false;
   }
 
   else{
     // Es de codigo
     if(exePos < codeSize){
-      uint32_t bytesToRead = codeSize - exePos > PAGE_SIZE ? PAGE_SIZE : (codeSize - exePos);
+      DEBUG('a', "Initializing code page %u, physical address 0x%X\n", vpn, physicalAddr);
+      uint32_t bytesToRead = PAGE_SIZE;//codeSize - exePos > PAGE_SIZE ? PAGE_SIZE : (codeSize - exePos);
       exe.ReadCodeBlock(&mainMemory[physicalAddr], bytesToRead, exePos);
       //pageTable[vpn].readOnly = true;
     }
     // Es de data
     else {
-      uint32_t bytesToRead = (initDataSize + codeSize) - exePos > PAGE_SIZE ? PAGE_SIZE : (initDataSize + codeSize) - exePos ;
+      DEBUG('a', "Initializing data page %u, physical address 0x%X\n", vpn, physicalAddr);
+      uint32_t bytesToRead =PAGE_SIZE; // (initDataSize + codeSize) - exePos > PAGE_SIZE ? PAGE_SIZE : (initDataSize + codeSize) - exePos ;
       exe.ReadDataBlock(&mainMemory[physicalAddr], bytesToRead, (initDataSize + codeSize) - exePos);
       pageTable[vpn].readOnly = false;
     }
@@ -319,8 +323,10 @@ AddressSpace::RestoreState()
       // Guardar bit de referencia y de modificacion en la pagina de tablas correspondiente
       unsigned oldVpn = machine->GetMMU()->tlb[i].virtualPage;
       TranslationEntry *oldEntry = currentThread->space->GetEntry(oldVpn);
-      oldEntry->use = machine->GetMMU()->tlb[i].use;
-      oldEntry->dirty = machine->GetMMU()->tlb[i].dirty;
+      if(oldEntry != nullptr){
+        oldEntry->use = machine->GetMMU()->tlb[i].use;
+        oldEntry->dirty = machine->GetMMU()->tlb[i].dirty;
+      }
 
       machine->GetMMU()->tlb[i].valid = false;
     }

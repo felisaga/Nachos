@@ -111,6 +111,8 @@ main(void)
         if (lineSize == 0) {
             continue;
         }
+
+        //static const char PROMPT[] = "--> ";
         
         if (PrepareArguments(line, argv, MAX_ARG_COUNT) == 0) {
             WriteError("too many arguments.", OUTPUT);
