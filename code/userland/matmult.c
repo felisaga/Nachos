@@ -42,6 +42,7 @@ main(void)
     char buff[100];
     itoa(res, buff);
     Write(buff, strlen(buff), CONSOLE_OUTPUT);
+    Halt();
     // And then we are done.
     return res; // 7220
 }

@@ -11,6 +11,7 @@
 
 #include "exception_type.hh"
 #include "disk.hh"
+#include "statistics.hh"
 #include "translation_entry.hh"
 
 

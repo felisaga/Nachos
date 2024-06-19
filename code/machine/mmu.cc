@@ -34,6 +34,7 @@
 
 #include <stdio.h>
 extern Machine* machine;
+extern Statistics* stats;
 
 
 MMU::MMU(unsigned aNumPhysPages)
@@ -199,12 +200,15 @@ MMU::RetrievePageEntry(unsigned vpn, TranslationEntry **entry) const
             TranslationEntry *e = &tlb[i];
             if (e->valid && e->virtualPage == vpn) {
                 *entry = e;  // FOUND!
+                stats->tlbHits++;
+                stats->tlbTries++;
                 return NO_EXCEPTION;
             }
         }
 
         // Not found.
         DEBUG_CONT('a', "no valid TLB entry found for this virtual page!\n");
+        stats->tlbTries++;
         return PAGE_FAULT_EXCEPTION;  // Really, this is a TLB fault, the
                                       // page may be in memory, but not in
                                       // the TLB.

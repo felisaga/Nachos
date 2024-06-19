@@ -127,7 +127,7 @@ Initialize(int argc, char **argv)
 #ifdef USER_PROGRAM
     bool debugUserProg = false;  // Single step user program.
     int numPhysicalPages = DEFAULT_NUM_PHYS_PAGES;
-    
+
     activeThreads = new Table<Thread*>();
     activeThreads->Add(currentThread);
 #endif

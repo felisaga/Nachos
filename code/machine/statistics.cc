@@ -43,5 +43,7 @@ Statistics::Print()
     printf("Disk I/O: reads %lu, writes %lu\n", numDiskReads, numDiskWrites);
     printf("Console I/O: reads %lu, writes %lu\n",
            numConsoleCharsRead, numConsoleCharsWritten);
-    printf("Paging: faults %lu\n", numPageFaults);
+    printf("Paging: faults %lu, hits %lu, total %lu, ratio %f.\n",
+            numPageFaults, tlbHits, tlbTries,
+            (double) tlbHits / (double) tlbTries);
 }

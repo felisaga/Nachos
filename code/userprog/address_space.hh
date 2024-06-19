@@ -13,13 +13,11 @@
 #ifndef NACHOS_USERPROG_ADDRESSSPACE__HH
 #define NACHOS_USERPROG_ADDRESSSPACE__HH
 
-
-#include "filesys/file_system.hh"
+//#include "filesys/file_system.hh"
 #include "machine/translation_entry.hh"
-
+#include "lib/bitmap.hh"
 
 const unsigned USER_STACK_SIZE = 1024;  ///< Increase this as necessary!
-
 
 class AddressSpace {
 public:
@@ -47,7 +45,15 @@ public:
     void SaveState();
     void RestoreState();
 
-    TranslationEntry GetEntry(unsigned vpn);
+    TranslationEntry* LoadPage(unsigned vpn);
+
+    TranslationEntry* GetEntry(unsigned vpn);
+
+    int addPage(unsigned vpn);
+
+    void SwapPage(unsigned vpn);
+
+    void RemovePage();
 
 private:
 
@@ -57,6 +63,13 @@ private:
     /// Number of pages in the virtual address space.
     unsigned numPages;
 
+    OpenFile* exe_file;
+    
+    #ifdef SWAP
+        OpenFile* swapFile;
+
+        Bitmap * swapMap;
+    #endif
 };
 
 

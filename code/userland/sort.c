@@ -38,6 +38,8 @@ main(void)
     char buff[100];
     itoa(A[0], buff);
     Write(buff, strlen(buff), CONSOLE_OUTPUT);
+
+    Halt();
     // And then we're done -- should be 0!
     return A[0];
 }

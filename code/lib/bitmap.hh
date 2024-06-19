@@ -17,10 +17,9 @@
 #ifndef NACHOS_LIB_BITMAP__HH
 #define NACHOS_LIB_BITMAP__HH
 
-
 #include "utility.hh"
 #include "filesys/open_file.hh"
-
+//#include "threads/thread.hh"
 
 /// A “bitmap” -- an array of bits, each of which can be independently set,
 /// cleared, and tested.
@@ -30,6 +29,18 @@
 ///
 /// Each bit represents whether the corresponding sector or page is in use
 /// or free.
+class Thread;
+
+#ifdef SWAP
+struct coreEntry
+{
+    Thread *thread;
+    unsigned vpn;
+    //bool dirty;
+    //bool used;
+};
+#endif
+
 class Bitmap {
 public:
 
@@ -57,6 +68,18 @@ public:
 
     /// Return the number of clear bits.
     unsigned CountClear() const;
+    
+    #ifdef SWAP
+    unsigned GetVPN(int frame);
+
+    Thread* GetThread(int frame);
+
+    void AddEntry(int frame, unsigned vpn, Thread *current_thread);
+
+    void RemoveEntry(int frame);
+
+    int PickVictim(unsigned num_physical_pages);
+    #endif
 
     /// Print contents of bitmap.
     void Print() const;
@@ -85,7 +108,9 @@ private:
     /// Bit storage.
     unsigned *map;
 
+    #ifdef SWAP
+    coreEntry *coreMap;
+    #endif
 };
-
 
 #endif

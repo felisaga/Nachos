@@ -11,7 +11,6 @@
 
 #include <stdio.h>
 
-
 /// Initialize a bitmap with `nitems` bits, so that every bit is clear.  It
 /// can be added somewhere on a list.
 ///
@@ -26,6 +25,11 @@ Bitmap::Bitmap(unsigned nitems)
     for (unsigned i = 0; i < numBits; i++) {
         Clear(i);
     }
+
+    #ifdef SWAP
+    struct coreEntry coreMap2[nitems];
+    coreMap = coreMap2;
+    #endif
 }
 
 /// De-allocate a bitmap.
@@ -94,6 +98,65 @@ Bitmap::CountClear() const
     }
     return count;
 }
+
+#ifdef SWAP
+unsigned
+Bitmap::GetVPN(int frame)
+{
+    return coreMap[frame].vpn;
+}
+
+Thread*
+Bitmap::GetThread(int frame)
+{
+    return coreMap[frame].thread;
+}
+
+void
+Bitmap::AddEntry(int frame, unsigned vpn, Thread *current_thread)
+{
+    coreMap[frame].thread = current_thread;
+    coreMap[frame].vpn = vpn;
+}
+
+void
+Bitmap::RemoveEntry(int frame)
+{
+    coreMap[frame].thread = nullptr;
+    coreMap[frame].vpn = (unsigned) -1;
+    Clear(frame);
+}
+
+int
+Bitmap::PickVictim(unsigned num_physical_pages)
+{   
+    static unsigned victim = -1;
+
+    #ifdef PRPOLICY_FIFO
+    victim++;
+    #elif PRPOLICY_CLOCK
+    static unsigned clock = 0;
+    AddressSpace* space  = pages->coreMap[clock].thread->space;
+    unsigned virtualPage = pages->coreMap[clock].virtualPage;
+
+    if (!space->pageTable[virtualPage].use) {
+        victim = clock;
+        clock++;
+        clock %= num_physical_pages;
+    } else {
+        space->pageTable[virtualPage].use = false;
+        clock++;
+        clock %= num_physical_pages;
+        victim = PickVictim();
+    }
+    #else
+    victim = SystemDep::Random();
+    #endif
+
+    return victim % num_physical_pages;
+}
+
+#endif
 
 /// Print the contents of the bitmap, for debugging.
 ///

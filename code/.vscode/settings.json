@@ -1,6 +1,10 @@
 {
   "files.associations": {
     "syscall.h": "c",
-    "fstream": "c"
+    "fstream": "c",
+    "array": "cpp",
+    "string_view": "cpp",
+    "initializer_list": "cpp",
+    "utility": "cpp"
   }
 }

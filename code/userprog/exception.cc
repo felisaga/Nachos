@@ -428,17 +428,31 @@ SyscallHandler(ExceptionType _et)
 
 static void
 PageFaultHandler(ExceptionType _et){
+    stats->tlbTries--;
+    stats->tlbHits--;
     int vaddr = machine->ReadRegister(BAD_VADDR_REG);
     int vpn = vaddr / PAGE_SIZE;
-    DEBUG('e', "Page fault at address %d\n", vaddr);
+    //DEBUG('e', "Page fault at address %d\n", vaddr);
     unsigned i = currentThread->TlbIndex++ % TLB_SIZE;
-    TranslationEntry entry = currentThread->space->GetEntry(vpn);
-    machine->GetMMU()->tlb[i].virtualPage  = entry.virtualPage;
-    machine->GetMMU()->tlb[i].physicalPage = entry.physicalPage;
-    machine->GetMMU()->tlb[i].valid        = entry.valid;
-    machine->GetMMU()->tlb[i].readOnly     = entry.readOnly;
-    machine->GetMMU()->tlb[i].use          = entry.use;
-    machine->GetMMU()->tlb[i].dirty        = entry.dirty;
+
+    #ifdef DEMAND_LOADING
+    TranslationEntry *entry = currentThread->space->LoadPage(vpn);
+    #else
+    TranslationEntry *entry = currentThread->space->GetEntry(vpn);
+    #endif
+
+    // Guardar bit de referencia y de modificacion en la pagina de tablas correspondiente
+    unsigned oldVpn = machine->GetMMU()->tlb[i].virtualPage;
+    TranslationEntry *oldEntry = currentThread->space->GetEntry(oldVpn);
+    oldEntry->use = machine->GetMMU()->tlb[i].use;
+    oldEntry->dirty = machine->GetMMU()->tlb[i].dirty;
+
+    machine->GetMMU()->tlb[i].virtualPage  = entry->virtualPage;
+    machine->GetMMU()->tlb[i].physicalPage = entry->physicalPage;
+    machine->GetMMU()->tlb[i].valid        = entry->valid;
+    machine->GetMMU()->tlb[i].readOnly     = entry->readOnly;
+    machine->GetMMU()->tlb[i].use          = entry->use;
+    machine->GetMMU()->tlb[i].dirty        = entry->dirty;
 }
 
 /// By default, only system calls have their own handler.  All other
