@@ -236,7 +236,7 @@ SyscallHandler(ExceptionType _et)
             int buffer = machine->ReadRegister(4);
             int size = machine->ReadRegister(5);
             int fid = machine->ReadRegister(6);
-            DEBUG('e', "`Open` requested for fileId '%i'.\n", fid);
+            DEBUG('e', "`Read` requested for fileId '%i'.\n", fid);
 
             ASSERT(size > 0);
             ASSERT(buffer != 0);
