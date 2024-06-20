@@ -41,9 +41,12 @@ main(void)
     int res = C[DIM - 1][DIM - 1];
     char buff[100];
     itoa(res, buff);
+    int len = strlen(buff);
+    buff[len] = '\n';
+    buff[len+1] = '\0';
     Write(buff, strlen(buff), CONSOLE_OUTPUT);
-    
-    Halt();
+    Exit(1);
+    //Halt();
     // And then we are done.
     return res; // 7220
 }

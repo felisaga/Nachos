@@ -76,7 +76,7 @@ AddressSpace::SwapPage(unsigned vpn) {
 /// First, set up the translation from program memory to physical memory.
 /// For now, this is really simple (1:1), since we are only uniprogramming,
 /// and we have a single unsegmented page table.
-AddressSpace::AddressSpace(OpenFile *executable_file)
+AddressSpace::AddressSpace(OpenFile *executable_file, Thread* thread)
 {
     ASSERT(executable_file != nullptr);
     exe_file = executable_file;
@@ -100,10 +100,11 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
       // Initialize swap file.
       DEBUG('a', "Initialize swap file\n");
       char swapFileName[FILE_NAME_MAX_LEN];
-      snprintf(swapFileName, FILE_NAME_MAX_LEN, "SWAP.%u", currentThread->pid);
+      snprintf(swapFileName, FILE_NAME_MAX_LEN, "SWAP.%u", thread->pid);
       fileSystem->Create(swapFileName, size);
       swapFile = fileSystem->Open(swapFileName);
       ASSERT(swapFile);
+      threadPid = thread->pid;
       swapMap = new Bitmap(numPages);
     #endif
 
@@ -273,6 +274,12 @@ AddressSpace::~AddressSpace()
         pages->Clear(pageTable[i].physicalPage); // = i; 
     }
     delete [] pageTable;
+
+    #ifdef SWAP
+      char swapFileName[FILE_NAME_MAX_LEN];
+      snprintf(swapFileName, FILE_NAME_MAX_LEN, "SWAP.%u", threadPid);
+      fileSystem->Remove(swapFileName);
+    #endif
 }
 
 /// Set the initial values for the user-level register set.
@@ -321,12 +328,12 @@ AddressSpace::RestoreState()
   #ifdef  USE_TLB
     for(unsigned i = 0; i < TLB_SIZE; i++) {
       // Guardar bit de referencia y de modificacion en la pagina de tablas correspondiente
-      unsigned oldVpn = machine->GetMMU()->tlb[i].virtualPage;
-      TranslationEntry *oldEntry = currentThread->space->GetEntry(oldVpn);
-      if(oldEntry != nullptr){
-        oldEntry->use = machine->GetMMU()->tlb[i].use;
-        oldEntry->dirty = machine->GetMMU()->tlb[i].dirty;
-      }
+      //unsigned oldVpn = machine->GetMMU()->tlb[i].virtualPage;
+      //TranslationEntry *oldEntry = currentThread->space->GetEntry(oldVpn);
+      //if(oldEntry != nullptr){
+      //  oldEntry->use = machine->GetMMU()->tlb[i].use;
+      //  oldEntry->dirty = machine->GetMMU()->tlb[i].dirty;
+      //}
 
       machine->GetMMU()->tlb[i].valid = false;
     }

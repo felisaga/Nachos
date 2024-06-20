@@ -383,10 +383,11 @@ SyscallHandler(ExceptionType _et)
 
             DEBUG('e', "`Exec` requested for file `%s`.\n", filename);
 
-            OpenFile *file = fileSystem->Open(filename);
-            AddressSpace *space = new AddressSpace(file);
-
             Thread *newThread = new Thread(filename, 1);
+
+            OpenFile *file = fileSystem->Open(filename);
+            AddressSpace *space = new AddressSpace(file, newThread);
+
             SpaceId id = newThread->LoadAddressSpace(space);
 
             if (id < 0) {
