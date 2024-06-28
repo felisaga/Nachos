@@ -179,7 +179,7 @@ bool
 FileSystem::Create(const char *name, unsigned initialSize)
 {
     ASSERT(name != nullptr);
-    ASSERT(initialSize < MAX_FILE_SIZE);
+    ASSERT(initialSize < 4 + NUM_SECTORS * SECTOR_SIZE);
 
     DEBUG('f', "Creating file %s, size %u\n", name, initialSize);
 

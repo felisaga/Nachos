@@ -41,21 +41,39 @@ FileHeader::Allocate(Bitmap *freeMap, unsigned fileSize)
 {
     ASSERT(freeMap != nullptr);
 
-    if (fileSize > MAX_FILE_SIZE) {
-        return false;
-    }
-
     raw.numBytes = fileSize;
     raw.numSectors = DivRoundUp(fileSize, SECTOR_SIZE);
     if (freeMap->CountClear() < raw.numSectors) {
         return false;  // Not enough space.
     }
 
-    for (unsigned i = 0; i < raw.numSectors; i++) {
-        raw.dataSectors[i] = freeMap->Find();
+    if (fileSize <= MAX_FILE_SIZE) {
+        DEBUG('f', "Creando file header simple\n");
+        for (unsigned i = 0; i < raw.numSectors; i++)
+            raw.dataSectors[i] = freeMap->Find();
+    }
+    else {
+        unsigned numIndirect = DivRoundUp(raw.numSectors, NUM_DIRECT);
+        DEBUG('f', "Creando file header con indireccion\n");
+        for (unsigned i = 0; i < numIndirect; i++) {
+            int sector = freeMap->Find();
+            raw.dataSectors[i] = sector;
+
+            unsigned toWrite = fileSize > MAX_FILE_SIZE ? MAX_FILE_SIZE : fileSize;
+            FileHeader *h = new FileHeader;
+            bool success = h->Allocate(freeMap, toWrite);
+            
+            if(success) h->WriteBack(sector);
+            else return false;
+
+            if(fileSize > MAX_FILE_SIZE) fileSize -= MAX_FILE_SIZE;
+
+            delete h;
+        }
     }
     return true;
 }
+
 
 /// De-allocate all the space allocated for data blocks for this file.
 ///
@@ -98,7 +116,19 @@ FileHeader::WriteBack(unsigned sector)
 unsigned
 FileHeader::ByteToSector(unsigned offset)
 {
-    return raw.dataSectors[offset / SECTOR_SIZE];
+    if(raw.numBytes <= MAX_FILE_SIZE){ //Esta en este nivel
+        //DEBUG('f',"aaaaaaaaaaaaaaaaa\n");
+        return raw.dataSectors[offset / SECTOR_SIZE];
+    }
+    else{
+        int sector = raw.dataSectors[offset / MAX_FILE_SIZE];
+        FileHeader *hdr = new FileHeader; 
+        hdr->FetchFrom(sector);
+        unsigned res = hdr->ByteToSector(offset % MAX_FILE_SIZE);
+        //DEBUG('f',"Translate pos: %u a %u, sector %d\n",offset, res, sector);
+        delete hdr;
+        return res;
+    }
 }
 
 /// Return the number of bytes in the file.
