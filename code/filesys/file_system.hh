@@ -134,6 +134,7 @@ public:
     /// Delete a file (UNIX `unlink`).
     bool Remove(const char *name);
 
+    bool Extend(FileHeader *fileH, unsigned newFilesize);
     /// List all the files in the file system.
     void List();
     

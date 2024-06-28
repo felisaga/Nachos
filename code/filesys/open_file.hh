@@ -119,6 +119,7 @@ public:
 
     fileDataEntry *fileData;
   private:
+    bool writing = false;
     FileHeader *hdr;  ///< Header for this file.
     unsigned seekPosition;  ///< Current position within the file.
 };

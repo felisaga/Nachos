@@ -132,12 +132,12 @@ OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
 
     // Read in all the full and partial sectors that we need.
     buf = new char [numSectors * SECTOR_SIZE];    
-    fileLock->Acquire();
+    if(!writing) fileLock->Acquire();
     for (unsigned i = firstSector; i <= lastSector; i++) {
         synchDisk->ReadSector(hdr->ByteToSector(i * SECTOR_SIZE),
                               &buf[(i - firstSector) * SECTOR_SIZE]);
     }
-    fileLock->Release();
+    if(!writing) fileLock->Release();
 
     // Copy the part we want.
     memcpy(into, &buf[position - firstSector * SECTOR_SIZE], numBytes);
@@ -157,14 +157,20 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
     bool firstAligned, lastAligned;
     char *buf;
 
-    if (position >= fileLength) {
-        return 0;  // Check request.
-    }
-    if (position + numBytes > fileLength) {
-        numBytes = fileLength - position;
-    }
     DEBUG('f', "Writing %u bytes at %u, from file of length %u.\n",
           numBytes, position, fileLength);
+
+    fileLock->Acquire();
+    writing = true;
+    if (position + numBytes > fileLength) {
+        unsigned expand = numBytes;
+        DEBUG('f', "Expanding %u bytes to file.\n", expand);
+        bool success = fileSystem->Extend(hdr, fileLength + numBytes);
+        if(success)
+            hdr->WriteBack(fileData->sector); //Falta encontrar una forma de que el resto de hilos con el archivo abierto vean el cambio 
+        else
+            numBytes = fileLength - position;
+    }
 
     firstSector = DivRoundDown(position, SECTOR_SIZE);
     lastSector  = DivRoundDown(position + numBytes - 1, SECTOR_SIZE);
@@ -188,11 +194,11 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
     memcpy(&buf[position - firstSector * SECTOR_SIZE], from, numBytes);
 
     // Write modified sectors back.
-    fileLock->Acquire();
     for (unsigned i = firstSector; i <= lastSector; i++) {
         synchDisk->WriteSector(hdr->ByteToSector(i * SECTOR_SIZE),
                                &buf[(i - firstSector) * SECTOR_SIZE]);
     }
+    writing = false;
     fileLock->Release();
     delete [] buf;
     return numBytes;

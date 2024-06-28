@@ -296,6 +296,28 @@ FileSystem::Remove(const char *name)
     return true;
 }
 
+
+bool
+FileSystem::Extend(FileHeader *fileH, unsigned newFilesize)
+{
+    ASSERT(fileH != nullptr);
+
+    fileSysLock->Acquire();
+
+    Bitmap *freeMap = new Bitmap(NUM_SECTORS);
+    freeMap->FetchFrom(freeMapFile);
+
+    fileH->Extend(freeMap, newFilesize);
+
+    freeMap->WriteBack(freeMapFile);  // Flush to disk.
+
+    delete freeMap;
+
+    fileSysLock->Release();
+    return true;
+}
+
+
 /// List all the files in the file system directory.
 void
 FileSystem::List()

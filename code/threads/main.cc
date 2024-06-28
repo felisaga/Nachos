@@ -130,8 +130,10 @@ main(int argc, char **argv)
             interrupt->Halt();
         } else {
             if (!strncmp(*argv, "-t",2)) {         // Select specific test
-                ThreadTest(atoi((*argv)+2));
-                interrupt->Halt();
+                if(strncmp((*argv)+2, "c",1) && strncmp((*argv)+2, "f",1)){
+                    ThreadTest(atoi((*argv)+2));
+                    interrupt->Halt();
+                }
             }
         }
 #endif

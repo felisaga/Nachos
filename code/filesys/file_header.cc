@@ -67,7 +67,7 @@ FileHeader::Allocate(Bitmap *freeMap, unsigned fileSize)
             else return false;
 
             if(fileSize > MAX_FILE_SIZE) fileSize -= MAX_FILE_SIZE;
-
+            if(fileSize == 0) break; // Por las dudas
             delete h;
         }
     }
@@ -105,6 +105,107 @@ FileHeader::Deallocate(Bitmap *freeMap)
 
 }
 
+void 
+FileHeader::ModifySector(Bitmap *freeMap, unsigned id, unsigned sectorNumber, bool clearOld){
+    if(clearOld) freeMap->Clear(raw.dataSectors[id]);
+    raw.dataSectors[id] = sectorNumber;
+}
+
+bool 
+FileHeader::Extend(Bitmap *freeMap, unsigned newFilesize)
+{
+    ASSERT(freeMap != nullptr);
+    if(newFilesize <= raw.numBytes) return true; // Nothing to do
+    
+    unsigned bytesToAdd = newFilesize - raw.numBytes;
+    unsigned sectorsToAdd = DivRoundUp(bytesToAdd, SECTOR_SIZE);
+
+    if (freeMap->CountClear() < sectorsToAdd) {
+        return false;  // Not enough space.
+    }
+
+    if(raw.numBytes <= MAX_FILE_SIZE){ // No indirection already in place
+        if(newFilesize <= MAX_FILE_SIZE){ // It fits with no change needed 
+            for(unsigned i = raw.numSectors; i < sectorsToAdd; i++)
+                raw.dataSectors[i] = freeMap->Find();
+            raw.numBytes = newFilesize;
+            raw.numSectors = DivRoundUp(newFilesize, SECTOR_SIZE);
+            return true;
+        }
+        else{ // Indirection needed
+            FileHeader *newHdr = new FileHeader; // New header with indirection
+            bool success = newHdr->Allocate(freeMap, newFilesize); // Populate it (lo creamos)
+            if(!success) return false;
+            const RawFileHeader *newRaw = newHdr->GetRaw();
+            FileHeader *ToBeCopiedInto = new FileHeader; // Header of the first second level header of newHdr
+            ToBeCopiedInto->FetchFrom(newHdr->GetRaw()->dataSectors[0]); 
+
+            for(unsigned i = 0; i < raw.numSectors; i++)
+               ToBeCopiedInto->ModifySector(freeMap, i, raw.dataSectors[i], true); //We change the first raw.numSectors sectors to point to the old sectors
+
+            ToBeCopiedInto->WriteBack(newHdr->GetRaw()->dataSectors[0]); // Save changes
+
+            for(unsigned i = 0; i < DivRoundUp(newRaw->numSectors, NUM_DIRECT); i++) // Swap old header for new
+                raw.dataSectors[i] = newRaw->dataSectors[i];
+            raw.numBytes = newRaw->numBytes;
+            raw.numSectors = newRaw->numSectors;
+
+            delete newHdr;
+            delete ToBeCopiedInto;
+            return true;
+        }
+    }
+
+    // Indirection already in place but needs to be extended
+    unsigned fstLevelId = DivRoundDown(raw.numSectors, NUM_DIRECT);
+    unsigned sndLevelId = raw.numSectors % NUM_DIRECT;
+    FileHeader *sndLevel = new FileHeader;
+    sndLevel->FetchFrom(raw.dataSectors[fstLevelId]);
+
+    while(sectorsToAdd > 0 && sndLevelId >= NUM_DIRECT){ // Fill snd level header 
+        sndLevel->ModifySector(freeMap, sndLevelId++, freeMap->Find(), false);
+        sectorsToAdd--;
+        bytesToAdd -= SECTOR_SIZE;
+    }
+    sndLevel->WriteBack(raw.dataSectors[fstLevelId++]);
+
+    while(sectorsToAdd > 0 && fstLevelId >= NUM_DIRECT){
+        if(sectorsToAdd > (MAX_FILE_SIZE/SECTOR_SIZE)) {
+            bool success = sndLevel->Allocate(freeMap, MAX_FILE_SIZE);
+            if(!success) return false;
+            sectorsToAdd -= (MAX_FILE_SIZE/SECTOR_SIZE);
+            bytesToAdd -= MAX_FILE_SIZE;
+        }
+        else{
+            bool success = sndLevel->Allocate(freeMap, bytesToAdd);
+            if(!success) return false;
+            sectorsToAdd = 0;
+            bytesToAdd = 0;
+        }
+        sndLevel->WriteBack(raw.dataSectors[fstLevelId++]);
+    }
+    delete sndLevel;
+    /*
+    unsigned fstLevelId = DivRoundDown(raw.numSectors, NUM_DIRECT);
+    unsigned sndLevelId = raw.numSectors % NUM_DIRECT;
+    FileHeader *sndLevel = new FileHeader;
+    sndLevel->FetchFrom(raw.dataSectors[fstLevelId]);
+
+    for(unsigned i = 0; i < sectorsToAdd; i++){
+        sndLevel->ModifySector(freeMap, sndLevelId++, freeMap->Find(), false);
+        
+        if(sndLevelId >= NUM_DIRECT){
+            sndLevel->WriteBack(raw.dataSectors[fstLevelId]);
+            fstLevelId++;
+            sndLevel->FetchFrom(raw.dataSectors[fstLevelId]);
+            sndLevelId = 0;
+        }
+    }*/
+    return true;
+
+}
+
+
 /// Fetch contents of file header from disk.
 ///
 /// * `sector` is the disk sector containing the file header.
@@ -133,7 +234,7 @@ unsigned
 FileHeader::ByteToSector(unsigned offset)
 {
     if(raw.numBytes <= MAX_FILE_SIZE){ //Esta en este nivel
-        //DEBUG('f',"aaaaaaaaaaaaaaaaa\n");
+        DEBUG('f',"aaaaaaaaaaaaaaaaa\n");
         return raw.dataSectors[offset / SECTOR_SIZE];
     }
     else{
@@ -141,7 +242,7 @@ FileHeader::ByteToSector(unsigned offset)
         FileHeader *hdr = new FileHeader; 
         hdr->FetchFrom(sector);
         unsigned res = hdr->ByteToSector(offset % MAX_FILE_SIZE);
-        //DEBUG('f',"Translate pos: %u a %u, sector %d\n",offset, res, sector);
+        DEBUG('f',"Translate pos: %u a %u, sector %d\n",offset, res, sector);
         delete hdr;
         return res;
     }

@@ -41,6 +41,8 @@ public:
     /// De-allocate this file's data blocks.
     void Deallocate(Bitmap *bitMap);
 
+    bool Extend(Bitmap *freeMap, unsigned newFilesize);
+
     /// Initialize file header from disk.
     void FetchFrom(unsigned sectorNumber);
 
@@ -53,6 +55,9 @@ public:
 
     /// Return the length of the file in bytes
     unsigned FileLength() const;
+
+    void ModifySector(Bitmap *freeMap, unsigned id ,unsigned sectorNumber, bool clearOld);
+
 
     /// Print the contents of the file.
     void Print(const char *title);
