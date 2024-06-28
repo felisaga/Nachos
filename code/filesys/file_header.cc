@@ -83,10 +83,26 @@ FileHeader::Deallocate(Bitmap *freeMap)
 {
     ASSERT(freeMap != nullptr);
 
-    for (unsigned i = 0; i < raw.numSectors; i++) {
-        ASSERT(freeMap->Test(raw.dataSectors[i]));  // ought to be marked!
-        freeMap->Clear(raw.dataSectors[i]);
+    if (raw.numBytes <= MAX_FILE_SIZE) {
+        for (unsigned i = 0; i < raw.numSectors; i++){
+            ASSERT(freeMap->Test(raw.dataSectors[i]));  // ought to be marked!
+            freeMap->Clear(raw.dataSectors[i]);
+        }
     }
+    else {
+        unsigned numIndirect = DivRoundUp(raw.numSectors, NUM_DIRECT);
+        for (unsigned i = 0; i < numIndirect; i++) {
+            int sector = raw.dataSectors[i];
+            ASSERT(freeMap->Test(raw.dataSectors[i]));  // ought to be marked!
+
+            FileHeader *h = new FileHeader;
+            h->FetchFrom(sector);
+            h->Deallocate(freeMap);
+            freeMap->Clear(sector);
+            delete h;
+        }
+    }
+
 }
 
 /// Fetch contents of file header from disk.

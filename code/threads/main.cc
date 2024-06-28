@@ -83,7 +83,7 @@
 
 void Copy(const char *unixFile, const char *nachosFile);
 void Print(const char *file);
-void PerformanceTest(void);
+void PerformanceTest();
 void StartProcess(const char *file);
 void ConsoleTest(const char *in, const char *out);
 
