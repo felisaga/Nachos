@@ -22,7 +22,6 @@
 
 #include "lib/utility.hh"
 
-
 #ifdef FILESYS_STUB  // Temporarily implement calls to Nachos file system as
                      // calls to UNIX!  See definitions listed under `#else`.
 class OpenFile {
@@ -86,6 +85,8 @@ private:
 
 #else // FILESYS
 class FileHeader;
+struct fileDataEntry;
+
 
 class OpenFile {
 public:
@@ -114,6 +115,9 @@ public:
     // the UNIX idiom -- `lseek` to end of file, `tell`, `lseek` back).
     unsigned Length() const;
 
+    bool GotDeleted() const;
+
+    fileDataEntry *fileData;
   private:
     FileHeader *hdr;  ///< Header for this file.
     unsigned seekPosition;  ///< Current position within the file.

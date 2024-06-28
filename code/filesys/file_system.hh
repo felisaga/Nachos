@@ -37,6 +37,14 @@
 
 
 #include "open_file.hh"
+#include "threads/lock.hh"
+
+struct fileDataEntry {
+    int sector;
+    Lock *fileLock; 
+    unsigned numOpens;
+    bool deleteRequested;
+};
 
 
 #ifdef FILESYS_STUB  // Temporarily implement file system calls as calls to
@@ -128,7 +136,9 @@ public:
 
     /// List all the files in the file system.
     void List();
-
+    
+    fileDataEntry * GetData(int sector);
+    bool DeleteData(int sector);
     /// Check the filesystem.
     bool Check();
 
@@ -140,6 +150,9 @@ private:
                             ///< file.
     OpenFile *directoryFile;  ///< “Root” directory -- list of file names,
                               ///< represented as a file.
+
+    fileDataEntry *fileDatas;
+    Lock *fileSysLock;
 };
 
 #endif

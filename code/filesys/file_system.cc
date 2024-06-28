@@ -46,7 +46,7 @@
 #include "directory.hh"
 #include "file_header.hh"
 #include "lib/bitmap.hh"
-
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -69,6 +69,12 @@ static const unsigned DIRECTORY_SECTOR = 1;
 FileSystem::FileSystem(bool format)
 {
     DEBUG('f', "Initializing the file system.\n");
+    fileDatas = (fileDataEntry *) malloc(sizeof(fileDataEntry)*(NUM_DIR_ENTRIES+2));
+
+    for(unsigned i = 0; i < NUM_DIR_ENTRIES+2; i++){
+            fileDatas[i].sector = -1;
+    }
+
     if (format) {
         Bitmap     *freeMap = new Bitmap(NUM_SECTORS);
         Directory  *dir     = new Directory(NUM_DIR_ENTRIES);
@@ -102,7 +108,9 @@ FileSystem::FileSystem(bool format)
         // while Nachos is running.
 
         freeMapFile   = new OpenFile(FREE_MAP_SECTOR);
+        freeMapFile->fileData = GetData(FREE_MAP_SECTOR);
         directoryFile = new OpenFile(DIRECTORY_SECTOR);
+        directoryFile->fileData = GetData(DIRECTORY_SECTOR);
 
         // Once we have the files “open”, we can write the initial version of
         // each file back to disk.  The directory at this point is completely
@@ -128,8 +136,12 @@ FileSystem::FileSystem(bool format)
         // representing the bitmap and directory; these are left open while
         // Nachos is running.
         freeMapFile   = new OpenFile(FREE_MAP_SECTOR);
+        freeMapFile->fileData = GetData(FREE_MAP_SECTOR);
         directoryFile = new OpenFile(DIRECTORY_SECTOR);
+        directoryFile->fileData = GetData(DIRECTORY_SECTOR);
     }
+
+    fileSysLock = new Lock("FileSys Lock");
 }
 
 FileSystem::~FileSystem()
@@ -172,8 +184,8 @@ FileSystem::Create(const char *name, unsigned initialSize)
     DEBUG('f', "Creating file %s, size %u\n", name, initialSize);
 
     Directory *dir = new Directory(NUM_DIR_ENTRIES);
+    fileSysLock->Acquire();
     dir->FetchFrom(directoryFile);
-
     bool success;
 
     if (dir->Find(name) != -1) {
@@ -201,6 +213,8 @@ FileSystem::Create(const char *name, unsigned initialSize)
         }
         delete freeMap;
     }
+
+    fileSysLock->Release();
     delete dir;
     return success;
 }
@@ -221,11 +235,14 @@ FileSystem::Open(const char *name)
     OpenFile  *openFile = nullptr;
 
     DEBUG('f', "Opening file %s\n", name);
+    fileSysLock->Acquire();
     dir->FetchFrom(directoryFile);
     int sector = dir->Find(name);
     if (sector >= 0) {
         openFile = new OpenFile(sector);  // `name` was found in directory.
+        openFile->fileData = GetData(sector);
     }
+    fileSysLock->Release();
     delete dir;
     return openFile;  // Return null if not found.
 }
@@ -248,27 +265,34 @@ FileSystem::Remove(const char *name)
     ASSERT(name != nullptr);
 
     Directory *dir = new Directory(NUM_DIR_ENTRIES);
+    fileSysLock->Acquire();
     dir->FetchFrom(directoryFile);
     int sector = dir->Find(name);
     if (sector == -1) {
        delete dir;
        return false;  // file not found
     }
-    FileHeader *fileH = new FileHeader;
-    fileH->FetchFrom(sector);
 
-    Bitmap *freeMap = new Bitmap(NUM_SECTORS);
-    freeMap->FetchFrom(freeMapFile);
+    if(DeleteData(sector)){
 
-    fileH->Deallocate(freeMap);  // Remove data blocks.
-    freeMap->Clear(sector);      // Remove header block.
-    dir->Remove(name);
+        FileHeader *fileH = new FileHeader;
+        fileH->FetchFrom(sector);
 
-    freeMap->WriteBack(freeMapFile);  // Flush to disk.
-    dir->WriteBack(directoryFile);    // Flush to disk.
-    delete fileH;
-    delete dir;
-    delete freeMap;
+        Bitmap *freeMap = new Bitmap(NUM_SECTORS);
+        freeMap->FetchFrom(freeMapFile);
+
+        fileH->Deallocate(freeMap);  // Remove data blocks.
+        freeMap->Clear(sector);      // Remove header block.
+        dir->Remove(name);
+
+        freeMap->WriteBack(freeMapFile);  // Flush to disk.
+        dir->WriteBack(directoryFile);    // Flush to disk.
+        delete fileH;
+        delete dir;
+        delete freeMap;
+    }
+
+    fileSysLock->Release();
     return true;
 }
 
@@ -278,10 +302,55 @@ FileSystem::List()
 {
     Directory *dir = new Directory(NUM_DIR_ENTRIES);
 
+    fileSysLock->Acquire();
     dir->FetchFrom(directoryFile);
     dir->List();
+    fileSysLock->Release();
     delete dir;
 }
+
+// Busca el file data correspondiente al sector, si no existe lo crea
+fileDataEntry *
+FileSystem::GetData(int sector){
+    for(unsigned i = 0; i < NUM_DIR_ENTRIES+2; i++){
+        if(fileDatas[i].sector == sector)
+            return &fileDatas[i];
+    }
+
+    for(unsigned i = 0; i < NUM_DIR_ENTRIES+2; i++){
+        if(fileDatas[i].sector == -1){
+            fileDatas[i].sector = sector;
+            fileDatas[i].fileLock = new Lock("SomeFileLock");
+            fileDatas[i].numOpens = 1;
+            fileDatas[i].deleteRequested = false;
+            return &fileDatas[i];
+        }     
+    }
+    return nullptr;
+}
+
+// Borra el file data correspondiente al sector si numOpens es igual a 1 y devuelve true, si no devuelve false
+bool
+FileSystem::DeleteData(int sector){
+    for(unsigned i = 0; i < NUM_DIR_ENTRIES+2; i++){
+        if(fileDatas[i].sector == sector){
+            if(fileDatas[i].numOpens == 1 ){
+                fileDatas[i].sector = -1;
+                delete fileDatas[i].fileLock;
+                fileDatas[i].numOpens = 0;
+                fileDatas[i].deleteRequested = false;
+                return true;
+            }
+            else{
+                fileDatas[i].numOpens--;
+                return false;
+            }
+        }     
+    }
+
+    return true; // Caso que nunca fue abierto (archivo guardado de antes)
+}
+
 
 static bool
 AddToShadowBitmap(unsigned sector, Bitmap *map)
@@ -467,6 +536,8 @@ FileSystem::Check()
 void
 FileSystem::Print()
 {
+    fileSysLock->Acquire();
+
     FileHeader *bitH    = new FileHeader;
     FileHeader *dirH    = new FileHeader;
     Bitmap     *freeMap = new Bitmap(NUM_SECTORS);
@@ -488,6 +559,8 @@ FileSystem::Print()
     dir->FetchFrom(directoryFile);
     dir->Print();
     printf("--------------------------------\n");
+
+    fileSysLock->Release();
 
     delete bitH;
     delete dirH;

@@ -14,6 +14,8 @@
 #include "open_file.hh"
 #include "file_header.hh"
 #include "threads/system.hh"
+#include "threads/lock.hh"
+
 
 #include <string.h>
 
@@ -111,6 +113,7 @@ OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
     ASSERT(numBytes > 0);
 
     unsigned fileLength = hdr->FileLength();
+    Lock *fileLock = fileData->fileLock;
     unsigned firstSector, lastSector, numSectors;
     char *buf;
 
@@ -128,11 +131,13 @@ OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
     numSectors = 1 + lastSector - firstSector;
 
     // Read in all the full and partial sectors that we need.
-    buf = new char [numSectors * SECTOR_SIZE];
+    buf = new char [numSectors * SECTOR_SIZE];    
+    fileLock->Acquire();
     for (unsigned i = firstSector; i <= lastSector; i++) {
         synchDisk->ReadSector(hdr->ByteToSector(i * SECTOR_SIZE),
                               &buf[(i - firstSector) * SECTOR_SIZE]);
     }
+    fileLock->Release();
 
     // Copy the part we want.
     memcpy(into, &buf[position - firstSector * SECTOR_SIZE], numBytes);
@@ -147,6 +152,7 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
     ASSERT(numBytes > 0);
 
     unsigned fileLength = hdr->FileLength();
+    Lock *fileLock = fileData->fileLock;
     unsigned firstSector, lastSector, numSectors;
     bool firstAligned, lastAligned;
     char *buf;
@@ -182,10 +188,12 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
     memcpy(&buf[position - firstSector * SECTOR_SIZE], from, numBytes);
 
     // Write modified sectors back.
+    fileLock->Acquire();
     for (unsigned i = firstSector; i <= lastSector; i++) {
         synchDisk->WriteSector(hdr->ByteToSector(i * SECTOR_SIZE),
                                &buf[(i - firstSector) * SECTOR_SIZE]);
     }
+    fileLock->Release();
     delete [] buf;
     return numBytes;
 }
@@ -195,4 +203,10 @@ unsigned
 OpenFile::Length() const
 {
     return hdr->FileLength();
+}
+
+// Return if the file has been deleted by someone but still opened
+bool 
+OpenFile::GotDeleted() const{
+    return fileData->deleteRequested;
 }
